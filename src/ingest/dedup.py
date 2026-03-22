@@ -18,11 +18,20 @@ def compute_event_id(ts: str, actor_id: str, method_name: str, resource: str, in
 
 
 def insert_event(db: duckdb.DuckDBPyConnection, event: CanonicalEvent) -> bool:
-    """Insert event into DuckDB. Returns True if inserted, False if duplicate."""
-    count_before = db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+    """Insert event into DuckDB. Returns True if inserted, False if duplicate.
+
+    Uses SELECT check + INSERT rather than COUNT(*) before/after to avoid
+    O(n) table scans on every insert.
+    """
+    exists = db.execute(
+        "SELECT 1 FROM events WHERE event_id = ?", [event.event_id]
+    ).fetchone()
+    if exists:
+        return False
+
     db.execute(
         """
-        INSERT OR IGNORE INTO events (
+        INSERT INTO events (
             event_id, ts, window_start, actor_id, actor_type,
             actor_subtype, orchestrator_id, trigger_ref,
             provenance_level, provenance_source,
@@ -61,5 +70,4 @@ def insert_event(db: duckdb.DuckDBPyConnection, event: CanonicalEvent) -> bool:
             event.coverage_flag,
         ],
     )
-    count_after = db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
-    return count_after > count_before
+    return True

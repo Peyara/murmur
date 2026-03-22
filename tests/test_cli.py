@@ -1,6 +1,5 @@
 """Tests for Murmur CLI commands."""
 
-import os
 import pytest
 from pathlib import Path
 from click.testing import CliRunner

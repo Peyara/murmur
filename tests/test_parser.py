@@ -289,6 +289,15 @@ class TestFieldExtraction:
         event = parse_audit_log(raw)
         assert event.provenance_level == ProvenanceLevel.NONE
 
+    def test_provenance_level_weak_with_trigger_ref(self):
+        raw = _make_raw_log(
+            "storage.googleapis.com",
+            "storage.objects.get",
+            metadata={"trigger_ref": "sched-exec-001"},
+        )
+        event = parse_audit_log(raw)
+        assert event.provenance_level == ProvenanceLevel.WEAK
+
 
 # ── Edge case tests ─────────────────────────────────────────────────────
 

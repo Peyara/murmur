@@ -1,13 +1,14 @@
 """GCP Cloud Audit Log parser -> CanonicalEvent.
 
 Maps raw GCP audit log JSON entries to the canonical event schema.
-14 GCP method patterns map to 13 action types across 6 trust zones.
+13 ACTION_MAP entries (using substring matching) cover 14 GCP method
+patterns across 13 action types and 6 trust zones.
 """
 
-import hashlib
 from datetime import datetime
 
 from config.settings import SETTINGS
+from src.ingest.dedup import compute_event_id
 from src.schema import (
     ActionType, ActorType, CanonicalEvent, EventResult,
     ProvenanceLevel, ProvenanceSource, TargetType, TargetZone,
@@ -100,12 +101,6 @@ def _floor_to_window(ts: datetime, window_minutes: int = SETTINGS.window_size_mi
     return ts.replace(minute=minute, second=0, microsecond=0)
 
 
-def compute_event_id(ts: str, actor_id: str, method_name: str, resource: str, insert_id: str) -> str:
-    """Deterministic event ID from content hash."""
-    content = f"{ts}|{actor_id}|{method_name}|{resource}|{insert_id}"
-    return hashlib.sha256(content.encode()).hexdigest()[:32]
-
-
 def parse_audit_log(raw: dict) -> CanonicalEvent:
     """Parse a single GCP Cloud Audit Log JSON entry into a CanonicalEvent.
 
@@ -155,8 +150,8 @@ def parse_audit_log(raw: dict) -> CanonicalEvent:
     trigger_ref = metadata.get("trigger_ref")
     provenance_level = ProvenanceLevel.NONE
     provenance_source = ProvenanceSource.UNKNOWN
-    # Basic: if trigger_ref present, mark as potential WEAK (full resolution in 0B)
     if trigger_ref:
+        provenance_level = ProvenanceLevel.WEAK
         provenance_source = ProvenanceSource.CLOUD_SCHEDULER
 
     # Result
