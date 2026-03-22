@@ -93,3 +93,7 @@ uv run pytest -v -k "parser"     # Run specific tests
 **CI:** GitHub Actions runs pytest on Python 3.11 and 3.12 for all PRs to `main`.
 
 **TDD:** Tests written before implementation. Missing tests are a blocker.
+
+## Standards
+
+This project is built and maintained under Peyara engineering standards — a structured methodology for AI-assisted development covering session handoff, hypothesis-driven sprint phasing, TDD discipline, and living documentation. Standards are maintained at the Peyara organization level.
