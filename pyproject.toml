@@ -1,0 +1,29 @@
+[project]
+name = "murmur"
+version = "0.1.0"
+description = "Trajectory Risk Engine — physics-informed security detection for GCP audit logs"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1",
+    "duckdb>=1.0",
+    "numpy>=1.26",
+]
+
+[project.scripts]
+murmur = "src.cli:cli"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src", "config"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]

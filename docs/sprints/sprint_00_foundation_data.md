@@ -21,31 +21,33 @@ trigger_ref may not propagate natively from Cloud Scheduler into the audit log e
 
 ### Deliverables
 
-- [ ] `pyproject.toml` with `uv`: Python 3.11+, duckdb, numpy, pytest, click
-- [ ] `sql/schema.sql`: all DuckDB table definitions (events, sanctioned_patterns, actor_windows, zone_flux_windows, edges_window, closure_state, opening_closing_pairs, risk_scores, policy_suggestions, candidate_patterns)
-- [ ] `src/schema.py`: CanonicalEvent dataclass with all fields + enums (action_type, target_zone, provenance_level, actor_type, etc.)
-- [ ] `data/fixtures/`: 3 sample JSONL files:
-  - `normal_scheduled.jsonl` — Cloud Scheduler triggers normal-worker
-  - `key_secret_attack.jsonl` — key creation + secret access sequence
-  - `quiet_window.jsonl` — minimal/no activity
-- [ ] `src/ingest/parser.py`: GCP audit log JSON -> CanonicalEvent for all 13 action types (see mapping table in original spec)
-- [ ] `src/ingest/dedup.py`: idempotent event_id from deterministic hash of (ts, actor_id, methodName, resource, insertId)
-- [ ] `src/cli.py`: `init-db`, `ingest --sample`, `ingest --file PATH`
-- [ ] `config/settings.py`: all configurable parameters centralized (window_size, thresholds, GCS bucket, etc.)
-- [ ] `tests/conftest.py`: DuckDB in-memory fixture, sample event factory
-- [ ] Unit tests:
-  - Parser: one test per action type (13 tests)
-  - Schema: table creation succeeds
-  - Dedup: duplicate events rejected, unique events accepted
-  - event_id: deterministic (same input = same hash)
+- [x] `pyproject.toml` with `uv`: Python 3.11+, duckdb, numpy, pytest, click
+- [x] `sql/schema.sql`: all DuckDB table definitions (events, sanctioned_patterns, actor_windows, zone_flux_windows, edges_window, closure_state, opening_closing_pairs, risk_scores, policy_suggestions, candidate_patterns)
+- [x] `src/schema.py`: CanonicalEvent dataclass with all fields + enums (action_type, target_zone, provenance_level, actor_type, etc.)
+- [x] `data/fixtures/`: 3 sample JSONL files:
+  - `normal_scheduled.jsonl` — Cloud Scheduler triggers normal-worker (6 events)
+  - `key_secret_attack.jsonl` — key creation + secret access sequence (6 events)
+  - `quiet_window.jsonl` — minimal/no activity (1 event)
+- [x] `src/ingest/parser.py`: GCP audit log JSON -> CanonicalEvent for all 13 action types (14 GCP method mappings)
+- [x] `src/ingest/dedup.py`: idempotent event_id from deterministic hash of (ts, actor_id, methodName, resource, insertId)
+- [x] `src/cli.py`: `init-db`, `ingest --sample`, `ingest --file PATH`
+- [x] `config/settings.py`: all configurable parameters centralized (window_size, thresholds, GCS bucket, exfil_risk_patterns, etc.)
+- [x] `tests/conftest.py`: DuckDB in-memory fixture, sample event factory
+- [x] Unit tests: 70 tests total
+  - Parser: 14 action type mapping + 13 field extraction + 5 edge case + 3 EXFIL_RISK zone = 35 tests
+  - Schema: 20 tests (table creation, existence, PK, dataclass, enums)
+  - Dedup: 7 tests (deterministic ID, duplicate rejection, field verification)
+  - CLI: 8 tests (init-db, ingest --sample, ingest --file)
 
-### Gate
+### Gate: PASSED
 
-`pytest` green. `ingest --sample` populates DuckDB with correct event count. All 13 action types parse correctly.
+`pytest` green (70 tests). `ingest --sample` populates DuckDB with 13 events. All 14 GCP method mappings (13 action types) parse correctly.
 
 ### Findings Log
 
-_Updated as work progresses:_
+- **EXFIL_RISK zone is resource-path-derived, not action-type-derived.** No GCP method maps directly to EXFIL_RISK. Parser checks bucket name prefixes (`external-*`, `public-*`) + configurable patterns in settings.py. Will need tuning with real GCP data in 0B.
+- **Hatchling build backend requires explicit package path.** `src/` layout needs `[tool.hatch.build.targets.wheel] packages = ["src", "config"]` in pyproject.toml.
+- **14 GCP method patterns -> 13 action types.** IAM_SET_POLICY has 2 sources (iam.googleapis.com, cloudresourcemanager.googleapis.com). IAM_IMPERSONATE has 2 (GenerateAccessToken, GenerateIdToken). Parser uses ordered list with substring matching — more specific patterns checked first.
 
 ---
 
