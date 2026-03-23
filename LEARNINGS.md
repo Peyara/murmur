@@ -6,6 +6,46 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-23 — Production — Sprint 0A build + PR review
+
+**Session Summary**
+- Mode: Production
+- Built Sprint 0A foundation data pipeline: schema, parser, dedup, CLI. TDD throughout. 71 tests green.
+- PR #1 submitted, reviewed (Claude principal engineer, 4-layer), blocker fixed, merged prep complete.
+- Sprint review issue #2 created with 7 follow-up items for Sprint 0B/1.
+
+**Implementation Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| EXFIL_RISK zone is resource-path-derived, not action-type-derived | No GCP method maps directly to EXFIL_RISK — parser checks bucket name prefixes + configurable patterns | Patterns need tuning with real GCP data in Sprint 0B |
+| 14 GCP method patterns map to 13 action types | IAM_SET_POLICY has 2 sources, IAM_IMPERSONATE has 2 — parser uses ordered substring matching | More specific patterns checked first to avoid mis-classification |
+| Hatchling + `src/` layout requires explicit package config | `[tool.hatch.build.targets.wheel] packages = ["src", "config"]` needed in pyproject.toml | Note for any future Peyara projects using same layout |
+
+**PR Review Findings**
+
+| Finding | Severity | Disposition |
+|---|---|---|
+| `.DS_Store` committed — macOS binary tracked in VCS | BLOCKER | Fixed in `8588940` |
+| SELECT-then-INSERT race in dedup under concurrent ingestion | WARNING | Deferred — safe at single-process scope. Fix with `INSERT OR IGNORE` when concurrency arrives (#2) |
+| `_floor_to_window` default arg captured at import time | WARNING | Deferred — settings effectively constant now. Quick fix in Sprint 0B (#2) |
+| SHA-256 truncated to 128 bits without documentation | WARNING | Deferred — collision risk negligible at scale. Document rationale in Sprint 0B (#2) |
+| `conn.close()` not reached on unexpected exceptions in CLI | WARNING | Deferred — wrap in `try/finally` in Sprint 0B (#2) |
+| Unknown GCP methods silently fall back to DATA zone | NIT | Add logging when fallback hits, Sprint 0B (#2) |
+| No indexes beyond primary keys on events table | NIT | Plan indexes alongside Sprint 1 windowing queries (#2) |
+
+**Process Learnings**
+- PR review as a sprint gate works well — caught a real blocker (.DS_Store) and surfaced 6 items that would have been invisible debt.
+- Creating a sprint review issue (#2) with checkboxes gives follow-up items a home. Without it, PR review comments are write-only — nobody goes back to check them.
+- `pr-notes` skill updated to include a "Review status" section as standard. Review findings that change how we build should flow into LEARNINGS.md.
+
+**Open Questions**
+1. trigger_ref viability — still the Sprint 0B critical experiment.
+2. EXFIL_RISK patterns — will current prefix-based approach work with real GCP bucket naming conventions?
+3. Dedup strategy — is `INSERT OR IGNORE` sufficient or do we need upsert semantics for event correction?
+
+---
+
 ### 2026-03-22 — R&D — Session handoff setup
 
 **Late addition:** Established session handoff mechanism.
