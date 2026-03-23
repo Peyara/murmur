@@ -37,6 +37,10 @@ For current state / resume point, see `CURRENT_STATE.md`.
 2. "Single commit for small related fixes from same review" — **watch**.
 3. "Symlinked peyara-standards as source of truth" — **watch** (document when second project joins).
 
+**Late-session Additions**
+- User flagged that safety sign-off block was being skipped in favor of informal questions. Saved feedback memory (`feedback_safety_signoff.md`). No CLAUDE.md change needed — rules are clear, behavior drifted.
+- User established hard rule: never push directly to main (except session-end handoff files). Codified in peyara-standards v1.5 (PR #2). Saved feedback memory (`feedback_never_push_main.md`).
+
 ---
 
 ### 2026-03-23 — Production — Sprint 0A PR review, merge, and close
