@@ -1,13 +1,20 @@
 """Tests for DuckDB schema creation and CanonicalEvent dataclass."""
 
-import duckdb
-import pytest
 from datetime import datetime
 from pathlib import Path
 
+import duckdb
+import pytest
+
 from src.schema import (
-    ActionType, ActorType, CanonicalEvent, EventResult,
-    ProvenanceLevel, ProvenanceSource, TargetType, TargetZone,
+    ActionType,
+    ActorType,
+    CanonicalEvent,
+    EventResult,
+    ProvenanceLevel,
+    ProvenanceSource,
+    TargetType,
+    TargetZone,
 )
 
 SCHEMA_PATH = Path(__file__).parent.parent / "sql" / "schema.sql"

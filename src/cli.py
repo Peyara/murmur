@@ -8,8 +8,8 @@ import click
 import duckdb
 
 from config.settings import SETTINGS
-from src.ingest.parser import parse_audit_log
 from src.ingest.dedup import insert_event
+from src.ingest.parser import parse_audit_log
 
 
 @click.group()

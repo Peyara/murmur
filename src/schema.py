@@ -5,18 +5,18 @@ provider-agnostic — Azure and AWS parsers can be added later without changing
 downstream layers.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     IAM_SET_POLICY = "IAM_SET_POLICY"
     IAM_CREATE_SA = "IAM_CREATE_SA"
     IAM_CREATE_KEY = "IAM_CREATE_KEY"
     IAM_DELETE_KEY = "IAM_DELETE_KEY"
     IAM_IMPERSONATE = "IAM_IMPERSONATE"
-    SECRET_ACCESS = "SECRET_ACCESS"
+    SECRET_ACCESS = "SECRET_ACCESS"  # nosec B105 — enum value, not a password
     KMS_DECRYPT = "KMS_DECRYPT"
     GCS_READ = "GCS_READ"
     GCS_WRITE = "GCS_WRITE"
@@ -26,21 +26,21 @@ class ActionType(str, Enum):
     OTHER = "OTHER"
 
 
-class TargetZone(str, Enum):
+class TargetZone(StrEnum):
     CONTROL = "CONTROL"
     IDENTITY = "IDENTITY"
-    SECRET = "SECRET"
+    SECRET = "SECRET"  # nosec B105
     DATA = "DATA"
     COMPUTE = "COMPUTE"
     EXFIL_RISK = "EXFIL_RISK"
 
 
-class TargetType(str, Enum):
+class TargetType(StrEnum):
     PROJECT = "PROJECT"
     IAM_POLICY = "IAM_POLICY"
     SERVICE_ACCOUNT = "SERVICE_ACCOUNT"
     SA_KEY = "SA_KEY"
-    SECRET = "SECRET"
+    SECRET = "SECRET"  # nosec B105
     KMS_KEY = "KMS_KEY"
     GCS_BUCKET = "GCS_BUCKET"
     BIGQUERY = "BIGQUERY"
@@ -49,26 +49,26 @@ class TargetType(str, Enum):
     OTHER = "OTHER"
 
 
-class ActorType(str, Enum):
+class ActorType(StrEnum):
     HUMAN = "HUMAN"
     SERVICE_ACCOUNT = "SERVICE_ACCOUNT"
     UNKNOWN = "UNKNOWN"
 
 
-class ActorSubtype(str, Enum):
+class ActorSubtype(StrEnum):
     AGENT = "AGENT"
     HUMAN = "HUMAN"
     SERVICE = "SERVICE"
     PIPELINE = "PIPELINE"
 
 
-class ProvenanceLevel(str, Enum):
+class ProvenanceLevel(StrEnum):
     NONE = "NONE"
     WEAK = "WEAK"
     STRONG = "STRONG"
 
 
-class ProvenanceSource(str, Enum):
+class ProvenanceSource(StrEnum):
     CLOUD_SCHEDULER = "CLOUD_SCHEDULER"
     CLOUD_BUILD = "CLOUD_BUILD"
     ORCHESTRATOR_SIGNATURE = "ORCHESTRATOR_SIGNATURE"
@@ -76,7 +76,7 @@ class ProvenanceSource(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class EventResult(str, Enum):
+class EventResult(StrEnum):
     SUCCESS = "SUCCESS"
     FAIL = "FAIL"
 

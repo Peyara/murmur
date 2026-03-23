@@ -1,11 +1,11 @@
 """Tests for GCP audit log parser. TDD — tests written before implementation."""
 
-import json
-import pytest
 from datetime import datetime
 
-from src.schema import ActionType, ActorType, ProvenanceLevel, TargetZone
+import pytest
+
 from src.ingest.parser import parse_audit_log
+from src.schema import ActionType, ActorType, ProvenanceLevel, TargetZone
 
 
 def _make_raw_log(

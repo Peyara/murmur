@@ -10,8 +10,14 @@ from datetime import datetime
 from config.settings import SETTINGS
 from src.ingest.dedup import compute_event_id
 from src.schema import (
-    ActionType, ActorType, CanonicalEvent, EventResult,
-    ProvenanceLevel, ProvenanceSource, TargetType, TargetZone,
+    ActionType,
+    ActorType,
+    CanonicalEvent,
+    EventResult,
+    ProvenanceLevel,
+    ProvenanceSource,
+    TargetType,
+    TargetZone,
 )
 
 # (serviceName, methodName substring) -> (ActionType, TargetZone)

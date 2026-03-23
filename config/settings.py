@@ -4,7 +4,6 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = Path(__file__).parent
 

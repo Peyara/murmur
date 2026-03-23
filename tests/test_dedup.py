@@ -1,10 +1,8 @@
 """Tests for event deduplication."""
 
-import pytest
-from datetime import datetime
 
-from src.schema import ActionType, ActorType, TargetType, TargetZone
 from src.ingest.dedup import compute_event_id, insert_event
+from src.schema import ActionType, TargetZone
 from tests.conftest import make_event
 
 
