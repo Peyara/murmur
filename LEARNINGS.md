@@ -6,6 +6,39 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-23 — Production — Sprint 0A review follow-ups (fix branch)
+
+**Session Summary**
+- Mode: Production
+- Addressed 4 of 7 Sprint 0A review follow-ups from issue #2 on `fix/sprint-0a-review-followups` branch. Fixed mutable default arg (`parser.py`), documented SHA truncation rationale (`dedup.py`), wrapped CLI connections in try/finally (`cli.py`), added debug logging for unmapped GCP methods (`parser.py`). PR #4 reviewed (0 findings), merged. Codified fix branch standard in peyara-standards (PR #1, merged). Commented on issue #2 referencing PR #4.
+- Status: Complete. Ready for Sprint 0B.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Fix branch for review follow-ups, not direct to main | Direct to main; bundle with Sprint 0B | Direct-to-main violates gated workflow. Bundling mixes concerns. |
+| 4 items in one commit | One commit per fix | All small, related, from same review. Single atomic commit cleaner. |
+| `logger.debug` not `logger.warning` for unmapped methods | warning, info | Unmapped methods expected in normal operation. Debug is correct severity. |
+| Codify fix branch standard in peyara-standards | Murmur only; no codification | Generalizable pattern. peyara-standards is canonical source via symlink. |
+| Leave issue #2 open with comment | Close entirely | 3 of 7 items still unresolved. |
+
+**CLAUDE.md Exceptions**
+- No exceptions this session.
+
+**Open Questions**
+1. trigger_ref viability — Sprint 0B critical experiment (carried forward).
+2. EXFIL_RISK patterns — prefix-based approach vs real GCP naming (carried forward).
+3. Dedup strategy — INSERT OR IGNORE vs upsert (carried forward).
+4. Peyara-standards repo structure — is `peyara/CLAUDE.md` the right path or should it be root?
+
+**CLAUDE.md Evolution Candidates**
+1. "Review follow-ups on fix branches" — **done** (codified in peyara-standards v1.4).
+2. "Single commit for small related fixes from same review" — **watch**.
+3. "Symlinked peyara-standards as source of truth" — **watch** (document when second project joins).
+
+---
+
 ### 2026-03-23 — Production — Sprint 0A PR review, merge, and close
 
 **Session Summary**
