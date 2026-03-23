@@ -6,6 +6,42 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-23 — Production — Sprint 0B-1: dedup fix + provenance enrichment
+
+**Session Summary**
+- Mode: Production
+- Built Sprint 0B-1: dedup race condition fix (ON CONFLICT DO NOTHING), provenance enrichment pipeline (`provenance_ingest.py`), CLI wiring (parse -> enrich -> insert), known_initiators.json populated. 14 new tests (84 total). 4-layer PR review (Claude + Copilot). PR #5 opened, reviewed, merged.
+- Status: Complete. PR #5 merged to main.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| ON CONFLICT DO NOTHING + RETURNING for dedup | Keep SELECT-then-INSERT; INSERT OR IGNORE | TOCTOU race. DuckDB uses ON CONFLICT syntax. RETURNING gives signal without extra round-trip. |
+| Provenance enrichment as separate module | Extend parser; merge into dedup | Parser should be self-contained (no config deps). Dedup is about idempotency, not classification. |
+| `dataclasses.replace()` for immutable enrichment | Mutate in place; create from scratch | Mutation = side effects. From-scratch loses fields. `replace()` is the standard pattern. |
+| Session scope: 0B-1 only (dedup + provenance) | Full 0B; 0B-1 + 0B-2 code only | One feature per session. Fetch.py is a separate feature with own dependency. |
+| BlobSource protocol for fetch.py (decided for 0B-2) | Mock GCS SDK | Protocol = clean seam + local dev mode. SDK mocks are brittle. |
+| DB-based checkpoints (decided for 0B-2) | File-based | DB keeps all state in one place. File can drift. |
+| Fix row-ordering test in-PR | Defer | One-line fix. Both Claude and Copilot flagged it independently. |
+
+**CLAUDE.md Exceptions**
+- No exceptions this session.
+
+**Open Questions**
+1. trigger_ref viability — Sprint 0B critical experiment (carried forward).
+2. Parser redundant provenance logic (parser.py:165-167) — simplify in 0B-2.
+3. Signal normalization method — defer to Sprint 1 (carried forward).
+4. Sandbox activity diversity (carried forward).
+5. EXFIL_RISK patterns — tune with real GCP data (carried forward).
+6. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1). Dedup race now FIXED.
+
+**CLAUDE.md Evolution Candidates**
+1. "Review findings convergence as validation" — when multiple reviewers flag same issue, fix in-PR not defer. **watch**
+2. "Enrichment as a pipeline step pattern" — parse -> enrich -> insert is clean and reusable. **watch** for Sprint 1.
+
+---
+
 ### 2026-03-23 — Production — Sprint 0A review follow-ups (fix branch)
 
 **Session Summary**
