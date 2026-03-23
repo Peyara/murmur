@@ -69,7 +69,7 @@ trigger_ref may not propagate natively from Cloud Scheduler into the audit log e
   - If NO: Implement fallback (temporal correlation: scheduled action within N seconds of Cloud Scheduler execution log entry)
   - Document: which approach works and why
 - [ ] `src/ingest/fetch.py`: GCS fetch with pagination
-- [ ] `src/ingest/provenance_ingest.py`: trigger_ref extraction + provenance_level assignment (WEAK for resolved, NONE otherwise)
+- [x] `src/ingest/provenance_ingest.py`: trigger_ref extraction + provenance_level assignment (WEAK for resolved, NONE otherwise)
 - [ ] `ingest --gcs-bucket BUCKET` operational on real logs
 - [ ] Parse rate measured on real logs: target >90%
 - [ ] Billing budget alert configured
@@ -85,7 +85,10 @@ trigger_ref may not propagate natively from Cloud Scheduler into the audit log e
 
 ### Findings Log
 
-_Updated as work progresses:_
+- **Dedup race condition fixed (issue #2).** Replaced SELECT-then-INSERT with `INSERT INTO ... ON CONFLICT (event_id) DO NOTHING RETURNING event_id`. DuckDB supports ON CONFLICT + RETURNING — returns the row if inserted, None if conflicted. Atomic, no TOCTOU race.
+- **Provenance enrichment is a two-factor check.** trigger_ref presence grants WEAK level, but provenance_source requires actor identity match against known_initiators. Worker SAs that inherit trigger_ref from a scheduler get WEAK/UNKNOWN (not CLOUD_SCHEDULER) — correct, since they aren't the initiator.
+- **Parser's basic provenance is a reasonable default.** Parser sets WEAK + CLOUD_SCHEDULER whenever trigger_ref is present (parser.py:165-167). Enrichment step refines provenance_source based on actor identity. Both layers are needed: parser for self-contained parsing, enrichment for classification.
+- **84 tests green** (was 70 in Sprint 0A). +1 dedup, +10 provenance, +2 CLI provenance verification, +1 from prior review fix.
 
 ---
 
@@ -106,3 +109,7 @@ _Updated as work progresses:_
 | `data/fixtures/*.jsonl` | Sample event files |
 | `tests/conftest.py` | Test fixtures |
 | `tests/test_parser.py` | Parser tests |
+| `tests/test_dedup.py` | Dedup tests |
+| `tests/test_provenance_ingest.py` | Provenance enrichment tests |
+| `tests/test_cli.py` | CLI tests |
+| `tests/test_schema.py` | Schema tests |
