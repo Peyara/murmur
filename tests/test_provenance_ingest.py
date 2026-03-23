@@ -4,7 +4,6 @@ from src.ingest.provenance_ingest import enrich_provenance, enrich_provenance_ba
 from src.schema import ProvenanceLevel, ProvenanceSource
 from tests.conftest import make_event
 
-
 SCHEDULER_SA = "service-123456@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
 BUILD_SA = "123456@cloudbuild.gserviceaccount.com"
 KNOWN = {SCHEDULER_SA, BUILD_SA}
