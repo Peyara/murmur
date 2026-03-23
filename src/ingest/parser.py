@@ -5,6 +5,7 @@ Maps raw GCP audit log JSON entries to the canonical event schema.
 patterns across 13 action types and 6 trust zones.
 """
 
+import logging
 from datetime import datetime
 
 from config.settings import SETTINGS
@@ -19,6 +20,8 @@ from src.schema import (
     TargetType,
     TargetZone,
 )
+
+logger = logging.getLogger(__name__)
 
 # (serviceName, methodName substring) -> (ActionType, TargetZone)
 # Order matters: more specific patterns checked first via substring match.
@@ -56,6 +59,7 @@ def _resolve_action(service_name: str, method_name: str) -> tuple[ActionType, Ta
     for svc, method_sub, action, zone in ACTION_MAP:
         if service_name == svc and method_sub in method_name:
             return action, zone
+    logger.debug("Unmapped GCP method: %s/%s -> OTHER/DATA", service_name, method_name)
     return ActionType.OTHER, TargetZone.DATA
 
 
@@ -101,8 +105,10 @@ def _parse_timestamp(ts_str: str) -> datetime:
     return datetime.fromisoformat(ts_str)
 
 
-def _floor_to_window(ts: datetime, window_minutes: int = SETTINGS.window_size_minutes) -> datetime:
+def _floor_to_window(ts: datetime, window_minutes: int | None = None) -> datetime:
     """Floor timestamp to window boundary."""
+    if window_minutes is None:
+        window_minutes = SETTINGS.window_size_minutes
     minute = (ts.minute // window_minutes) * window_minutes
     return ts.replace(minute=minute, second=0, microsecond=0)
 

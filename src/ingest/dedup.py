@@ -14,6 +14,8 @@ from src.schema import CanonicalEvent
 def compute_event_id(ts: str, actor_id: str, method_name: str, resource: str, insert_id: str) -> str:
     """Deterministic event ID from content hash. 32-char hex string."""
     content = f"{ts}|{actor_id}|{method_name}|{resource}|{insert_id}"
+    # Truncate to 128 bits (32 hex chars). At Murmur's scale (<1M events),
+    # collision probability is ~2^-97 (birthday bound). Full 256 bits unnecessary.
     return hashlib.sha256(content.encode()).hexdigest()[:32]
 
 
