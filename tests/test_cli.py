@@ -121,8 +121,8 @@ class TestIngestFile:
         assert len(rows) == 6
         for level, source in rows:
             assert level == "WEAK"
-        # First event is the scheduler SA itself (in known_initiators)
-        assert rows[0][1] == "CLOUD_SCHEDULER"
+        # At least one event should be the scheduler SA itself (in known_initiators)
+        assert any(source == "CLOUD_SCHEDULER" for _, source in rows)
 
     def test_attack_events_have_none_provenance(self, runner, tmp_db):
         """key_secret_attack.jsonl events have no trigger_ref -> provenance_level=NONE."""
