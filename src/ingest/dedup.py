@@ -1,6 +1,6 @@
 """Event deduplication — idempotent insertion into DuckDB.
 
-Uses deterministic event_id (SHA-256 hash) and INSERT OR IGNORE
+Uses deterministic event_id (SHA-256 hash) and ON CONFLICT DO NOTHING
 to ensure re-ingestion of the same log entries is safe.
 """
 
@@ -22,16 +22,10 @@ def compute_event_id(ts: str, actor_id: str, method_name: str, resource: str, in
 def insert_event(db: duckdb.DuckDBPyConnection, event: CanonicalEvent) -> bool:
     """Insert event into DuckDB. Returns True if inserted, False if duplicate.
 
-    Uses SELECT check + INSERT rather than COUNT(*) before/after to avoid
-    O(n) table scans on every insert.
+    Uses ON CONFLICT (event_id) DO NOTHING with RETURNING to atomically
+    skip duplicates without a separate SELECT round-trip.
     """
-    exists = db.execute(
-        "SELECT 1 FROM events WHERE event_id = ?", [event.event_id]
-    ).fetchone()
-    if exists:
-        return False
-
-    db.execute(
+    result = db.execute(
         """
         INSERT INTO events (
             event_id, ts, window_start, actor_id, actor_type,
@@ -42,6 +36,8 @@ def insert_event(db: duckdb.DuckDBPyConnection, event: CanonicalEvent) -> bool:
             result, project_id, env, is_deploy, is_incident,
             risk_tags, raw_ref, coverage_flag
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (event_id) DO NOTHING
+        RETURNING event_id
         """,
         [
             event.event_id,
@@ -72,4 +68,4 @@ def insert_event(db: duckdb.DuckDBPyConnection, event: CanonicalEvent) -> bool:
             event.coverage_flag,
         ],
     )
-    return True
+    return result.fetchone() is not None

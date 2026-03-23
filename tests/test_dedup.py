@@ -45,6 +45,15 @@ class TestInsertEvent:
         count = db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         assert count == 2
 
+    def test_rapid_duplicate_insert_no_error(self, db):
+        """ON CONFLICT DO NOTHING handles duplicates atomically — no race."""
+        event = make_event(event_id="rapid-001")
+        assert insert_event(db, event) is True
+        assert insert_event(db, event) is False
+        assert insert_event(db, event) is False
+        count = db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        assert count == 1
+
     def test_inserted_event_has_correct_fields(self, db):
         event = make_event(
             event_id="verify-001",

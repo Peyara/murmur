@@ -105,6 +105,40 @@ class TestIngestFile:
         assert "IDENTITY" in zones
         assert "SECRET" in zones
 
+    def test_scheduled_events_have_weak_provenance(self, runner, tmp_db):
+        """normal_scheduled.jsonl events have trigger_ref -> provenance_level=WEAK."""
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+        fixture = str(FIXTURES_DIR / "normal_scheduled.jsonl")
+        runner.invoke(cli, ["ingest", "--file", fixture, "--db-path", tmp_db])
+
+        import duckdb
+        conn = duckdb.connect(tmp_db)
+        rows = conn.execute(
+            "SELECT provenance_level, provenance_source FROM events "
+            "WHERE trigger_ref IS NOT NULL"
+        ).fetchall()
+        conn.close()
+        assert len(rows) == 6
+        for level, source in rows:
+            assert level == "WEAK"
+        # At least one event should be the scheduler SA itself (in known_initiators)
+        assert any(source == "CLOUD_SCHEDULER" for _, source in rows)
+
+    def test_attack_events_have_none_provenance(self, runner, tmp_db):
+        """key_secret_attack.jsonl events have no trigger_ref -> provenance_level=NONE."""
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+        fixture = str(FIXTURES_DIR / "key_secret_attack.jsonl")
+        runner.invoke(cli, ["ingest", "--file", fixture, "--db-path", tmp_db])
+
+        import duckdb
+        conn = duckdb.connect(tmp_db)
+        rows = conn.execute(
+            "SELECT DISTINCT provenance_level FROM events"
+        ).fetchall()
+        conn.close()
+        assert len(rows) == 1
+        assert rows[0][0] == "NONE"
+
     def test_nonexistent_file(self, runner, tmp_db):
         runner.invoke(cli, ["init-db", "--db-path", tmp_db])
         result = runner.invoke(cli, ["ingest", "--file", "/nonexistent.jsonl", "--db-path", tmp_db])

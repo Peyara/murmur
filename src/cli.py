@@ -10,6 +10,7 @@ import duckdb
 from config.settings import SETTINGS
 from src.ingest.dedup import insert_event
 from src.ingest.parser import parse_audit_log
+from src.ingest.provenance_ingest import enrich_provenance
 
 
 @click.group()
@@ -44,6 +45,7 @@ def init_db(db_path: str | None):
 def ingest(sample: bool, file_path: str | None, db_path: str | None):
     """Ingest GCP audit log events into DuckDB."""
     db_path = db_path or SETTINGS.db_path
+    known_initiators = SETTINGS.load_known_initiators()
     conn = duckdb.connect(db_path)
     try:
         if sample:
@@ -55,13 +57,13 @@ def ingest(sample: bool, file_path: str | None, db_path: str | None):
             total_inserted = 0
             total_skipped = 0
             for f in files:
-                inserted, skipped = _ingest_file(conn, f)
+                inserted, skipped = _ingest_file(conn, f, known_initiators)
                 total_inserted += inserted
                 total_skipped += skipped
             click.echo(f"Sample ingest complete: {total_inserted} inserted, {total_skipped} duplicates skipped")
 
         elif file_path:
-            inserted, skipped = _ingest_file(conn, Path(file_path))
+            inserted, skipped = _ingest_file(conn, Path(file_path), known_initiators)
             click.echo(f"Ingest complete: {inserted} inserted, {skipped} duplicates skipped")
 
         else:
@@ -71,8 +73,10 @@ def ingest(sample: bool, file_path: str | None, db_path: str | None):
         conn.close()
 
 
-def _ingest_file(conn: duckdb.DuckDBPyConnection, path: Path) -> tuple[int, int]:
-    """Parse and ingest a single JSONL file. Returns (inserted, skipped)."""
+def _ingest_file(
+    conn: duckdb.DuckDBPyConnection, path: Path, known_initiators: set[str]
+) -> tuple[int, int]:
+    """Parse, enrich provenance, and ingest a single JSONL file. Returns (inserted, skipped)."""
     inserted = 0
     skipped = 0
     parse_errors = 0
@@ -85,6 +89,7 @@ def _ingest_file(conn: duckdb.DuckDBPyConnection, path: Path) -> tuple[int, int]
             try:
                 raw = json.loads(line)
                 event = parse_audit_log(raw)
+                event = enrich_provenance(event, known_initiators)
                 if insert_event(conn, event):
                     inserted += 1
                 else:
