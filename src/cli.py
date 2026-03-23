@@ -30,8 +30,10 @@ def init_db(db_path: str | None):
         sys.exit(1)
 
     conn = duckdb.connect(db_path)
-    conn.execute(schema_path.read_text())
-    conn.close()
+    try:
+        conn.execute(schema_path.read_text())
+    finally:
+        conn.close()
     click.echo(f"Database initialized at {db_path}")
 
 
@@ -43,32 +45,30 @@ def ingest(sample: bool, file_path: str | None, db_path: str | None):
     """Ingest GCP audit log events into DuckDB."""
     db_path = db_path or SETTINGS.db_path
     conn = duckdb.connect(db_path)
+    try:
+        if sample:
+            fixtures_dir = Path(SETTINGS.fixtures_dir)
+            files = sorted(fixtures_dir.glob("*.jsonl"))
+            if not files:
+                click.echo(f"No JSONL files found in {fixtures_dir}", err=True)
+                sys.exit(1)
+            total_inserted = 0
+            total_skipped = 0
+            for f in files:
+                inserted, skipped = _ingest_file(conn, f)
+                total_inserted += inserted
+                total_skipped += skipped
+            click.echo(f"Sample ingest complete: {total_inserted} inserted, {total_skipped} duplicates skipped")
 
-    if sample:
-        fixtures_dir = Path(SETTINGS.fixtures_dir)
-        files = sorted(fixtures_dir.glob("*.jsonl"))
-        if not files:
-            click.echo(f"No JSONL files found in {fixtures_dir}", err=True)
-            conn.close()
+        elif file_path:
+            inserted, skipped = _ingest_file(conn, Path(file_path))
+            click.echo(f"Ingest complete: {inserted} inserted, {skipped} duplicates skipped")
+
+        else:
+            click.echo("Specify --sample or --file PATH", err=True)
             sys.exit(1)
-        total_inserted = 0
-        total_skipped = 0
-        for f in files:
-            inserted, skipped = _ingest_file(conn, f)
-            total_inserted += inserted
-            total_skipped += skipped
-        click.echo(f"Sample ingest complete: {total_inserted} inserted, {total_skipped} duplicates skipped")
-
-    elif file_path:
-        inserted, skipped = _ingest_file(conn, Path(file_path))
-        click.echo(f"Ingest complete: {inserted} inserted, {skipped} duplicates skipped")
-
-    else:
-        click.echo("Specify --sample or --file PATH", err=True)
+    finally:
         conn.close()
-        sys.exit(1)
-
-    conn.close()
 
 
 def _ingest_file(conn: duckdb.DuckDBPyConnection, path: Path) -> tuple[int, int]:
