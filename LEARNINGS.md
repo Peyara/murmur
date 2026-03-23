@@ -6,6 +6,40 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-23 — Production — Sprint 0A PR review, merge, and close
+
+**Session Summary**
+- Mode: Production
+- Ran 4-layer PR review on PR #1 (static analysis, Copilot [unavailable], Claude principal engineer review). Found 1 blocker + 4 warnings + 3 nits. Fixed blocker (.DS_Store). Created sprint review issue #2 with 7 follow-up items. Updated PR notes with review status. Updated pr-notes skill. Merged PR #1 to main (squash).
+- Status: Complete. Sprint 0A merged. Ready for Sprint 0B.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| COMMENT review (not REQUEST_CHANGES) | REQUEST_CHANGES | GitHub rejects requesting changes on own PR |
+| Single review body, not inline diff comments | Inline per-finding | GitHub position-based comments errored (422). Single body is reliable. |
+| Sprint review issue (#2) with checkboxes | Individual issues per finding; no tracking | Individual too granular for 7 small items. No tracking = write-only review comments. |
+| Squash merge for sprint branches | Regular merge (preserve 9 commits) | 9 commits are implementation steps, not independently meaningful. Clean main history. |
+| Review status as standard section in pr-notes skill | Keep review separate from PR notes | Review findings are part of "what happened" — PR description incomplete without them. |
+
+**CLAUDE.md Exceptions**
+- "One feature per session" — session covered review + fix + issue + learnings + skill update + merge. All part of one workflow (closing Sprint 0A). One-off.
+- "Tests before code" — .DS_Store fix is a .gitignore edit, not code. One-off.
+
+**Open Questions**
+1. trigger_ref viability — Sprint 0B critical experiment.
+2. EXFIL_RISK patterns — will prefix-based approach work with real GCP bucket naming?
+3. Dedup strategy — INSERT OR IGNORE sufficient, or need upsert for event correction?
+4. Copilot reviewer unavailable on repo — worth enabling?
+
+**CLAUDE.md Evolution Candidates**
+1. "PR review → sprint review issue → LEARNINGS.md" as standard sprint close — **promote**
+2. Squash merge as default for sprint branches — **watch**
+3. Self-review limitation note in pr-review skill — **promote** to skill update
+
+---
+
 ### 2026-03-23 — Production — Sprint 0A build + PR review
 
 **Session Summary**
