@@ -6,6 +6,41 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-24 — Production — Sprint 0B-2: GCP sandbox provisioning plan (blocked on auth)
+
+**Session Summary**
+- Mode: Production
+- Planned GCP sandbox provisioning for Sprint 0B-2. Drafted 10-step infrastructure plan: project creation, API enabling, GCS bucket, audit log sink, Data Access logs, secrets, Cloud Run, Cloud Scheduler, billing alert, e2-micro VM. Plan approved. User created GCP account (samreen654@gmail.com), billing, and murmur-sandbox project in console. No infrastructure commands executed — blocked on gcloud CLI auth (currently authenticated as shamreen.iram@lightbird.ai, not samreen654@gmail.com).
+- Status: Blocked. Resume by authenticating gcloud, then execute plan steps 1-10.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| us-central1 for all resources | us-east1, northamerica-northeast1 | Cheapest, broadest service availability. No data residency requirement. |
+| GCS sink (not BigQuery) for audit logs | BigQuery export | GCS matches fetch.py design (file-based ingestion). Simpler. BQ adds unnecessary complexity at this stage. |
+| Hello container first for Cloud Run | Custom secret-reading container from start | Avoids blocking on container build. Validates scheduler wiring first. Swap later. |
+| $25 budget alert via console | gcloud billing budgets API | Console is faster for one-time setup. Billing budgets API is complex for no benefit. |
+| `-sandbox` suffix on GCS bucket name | Plain `murmur-audit-logs` | Bucket names are globally unique. Suffix reduces collision risk. |
+| Separate scheduler-sa service account | Default compute SA | Principle of least privilege. Dedicated SA for scheduler -> Cloud Run invocation. |
+
+**CLAUDE.md Exceptions**
+- No exceptions this session.
+
+**Open Questions**
+1. trigger_ref viability — Sprint 0B critical experiment (carried forward, still untested).
+2. Parser redundant provenance logic (parser.py:165-167) — clean up in 0B-2 (carried forward).
+3. Signal normalization method — defer to Sprint 1 (carried forward).
+4. Sandbox activity diversity — may need manual activity generation (carried forward).
+5. EXFIL_RISK zone patterns — tune with real GCP data (carried forward).
+6. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1) (carried forward).
+7. gcloud auth — need to authenticate as samreen654@gmail.com before running any provisioning commands.
+
+**CLAUDE.md Evolution Candidates**
+1. "Interactive infra provisioning as guided walkthrough" — separate browser steps from CLI steps in plans. **watch**
+
+---
+
 ### 2026-03-23 — Production — Sprint 0B-1: dedup fix + provenance enrichment
 
 **Session Summary**
