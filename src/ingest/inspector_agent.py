@@ -115,13 +115,6 @@ def build_agent_input(report: InspectionReport) -> dict[str, Any]:
         log_type_summary[short] = count
 
     # Top fields per log type
-    fields_by_log = {}
-    for path, stats in report.field_inventory.items():
-        for log_name in report.log_types:
-            short = log_name.split("/logs/")[-1] if "/logs/" in log_name else log_name
-            if short not in fields_by_log:
-                fields_by_log[short] = []
-
     # Simplified field inventory
     field_summary = []
     for path, stats in sorted(

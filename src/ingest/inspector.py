@@ -225,6 +225,9 @@ def inspect_logs(directory: str | Path, cluster_window_seconds: float = 30.0) ->
     field_stats: dict[str, FieldStats] = {}
 
     for entry in entries:
+        if not isinstance(entry, dict):
+            logger.warning("Skipping non-dict log entry of type %s", type(entry).__name__)
+            continue
         # Categorize by log type
         log_name = entry.get("logName", "UNKNOWN")
         report.log_types[log_name] = report.log_types.get(log_name, 0) + 1

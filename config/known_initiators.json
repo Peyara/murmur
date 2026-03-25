@@ -1,1 +1,1 @@
-["service-123456@gcp-sa-cloudscheduler.iam.gserviceaccount.com", "scheduler-sa@<PROJECT_ID>.iam.gserviceaccount.com"]
+["service-123456@gcp-sa-cloudscheduler.iam.gserviceaccount.com"]
