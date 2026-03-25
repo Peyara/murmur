@@ -6,6 +6,53 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-25 — Production — GCSFetcher + CLI consolidation (PR #9)
+
+**Session Summary**
+- Mode: Production
+- Built GCSFetcher + SingleFileFetcher, unified all 4 CLI ingest paths (`--sample`, `--file`, `--local-dir`, `--gcs-bucket`) through `fetch_and_ingest()`, eliminated `_ingest_file` duplication. Fixed 3 deferred PR #7 nits. PR #9 opened, 4-layer review (0 blockers, 3 warnings, 3 nits), all warnings fixed in-PR. 118 tests green (was 103).
+- Status: Complete. PR #9 open, all findings resolved. Ready to merge + trigger_ref experiment next session.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Route all CLI ingest paths through `fetch_and_ingest` | Keep `_ingest_file` for `--file`; route only new paths | Partial consolidation leaves duplication. Audit log files are KB-range. |
+| `SingleFileFetcher` as BlobSource wrapper | `LocalFetcher(parent_dir)` with filter; call `_ingest_content` directly | Parent dir ingests all files. Direct call bypasses checkpointing. |
+| Lazy import for google.cloud.storage | Module-level import; try/except optional import | Module-level breaks `import src.ingest.fetch` without GCS SDK — LocalFetcher unusable in dev/test. |
+| File mtime in `--file` source_id | No mtime (dedup only); hash of file contents | No mtime blocks re-ingestion after edits. Hash requires reading entire file upfront. |
+| `click.UsageError` for mutual exclusivity | `click.echo` + `sys.exit(1)` | sys.exit bypasses Click error formatting. UsageError is idiomatic. |
+| `click.Path(file_okay=False)` on `--local-dir` | Rely on `LocalFetcher` ValueError | Click should catch at boundary — cleaner errors, fails before DB connection. |
+| Patch `google.cloud.storage.Client` in tests | Patch module; `patch.dict(sys.modules)` | Namespace package has no `storage` attribute until imported. `.Client` works. |
+| Fix all warnings in-PR (single commit) | Defer to fix branch | All small, related to this PR. No reason to defer. |
+
+**CLAUDE.md Exceptions**
+- No exceptions this session.
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| Module-level import of optional dep breaks unrelated code paths | GCSFetcher import would make LocalFetcher unusable without GCS SDK | Fixed — lazy import inside `__init__`. Pattern: always lazy-import optional heavy dependencies. |
+| `google.cloud` is a namespace package — can't patch it directly | `patch("google.cloud.storage")` raises `AttributeError` | Fixed — patch `google.cloud.storage.Client` instead. |
+| `gh pr edit` blocked by Projects Classic deprecation | GraphQL mutation fails with exit code 1 | Workaround: use REST API `gh api repos/.../pulls/N -X PATCH -F body=@file`. |
+| Routing `--file` through checkpointing changes re-run behavior | Old: re-parse + dedup. New: checkpoint blocks re-processing | Fixed — include file mtime in source_id so changed files bypass checkpoint. |
+| All 103 existing tests passed without modification after consolidation | Validates BlobSource abstraction is behavior-preserving | No action needed — good design signal. |
+
+**Open Questions**
+1. trigger_ref viability — Sprint 0B critical experiment, pipeline ready (carried forward).
+2. Signal normalization method — defer to Sprint 1 (carried forward).
+3. EXFIL_RISK zone patterns — tune with real GCP data (carried forward).
+4. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1) (carried forward).
+5. Stale .pyc causing phantom test failures — watch for recurrence (carried forward).
+6. `gh pr edit` blocked by Projects Classic deprecation — REST API workaround works.
+
+**CLAUDE.md Evolution Candidates**
+1. "REST API fallback when `gh pr edit` fails on Projects Classic deprecation" — **watch**.
+2. "Lazy imports for optional heavy dependencies" — **watch** (pattern emerged twice: GCS SDK).
+
+---
+
 ### 2026-03-24 — Production — Fix deferred review nits PR #6 + PR #7 (PR #8)
 
 **Session Summary**
