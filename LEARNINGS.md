@@ -6,6 +6,53 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-24 — Production — Sprint 0B-3: fetch pipeline + checkpointing (PR #7)
+
+**Session Summary**
+- Mode: Production
+- Merged PR #6 (security hardlines, from prior session). Built, reviewed, and merged PR #7: fetch pipeline with BlobSource protocol, LocalFetcher, DuckDB checkpointing, `--local-dir` CLI option, `ingest_checkpoints` schema table. Dismissed Dependabot alert #1 (Pygments ReDoS, no fix available). 4-layer PR review: 3 warnings fixed, 4 nits deferred. 102 tests green (up from 84).
+- Status: Complete. Both PRs merged. Main up to date.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| BlobSource as Protocol (structural typing) | ABC; mock GCS SDK directly | ABC adds unnecessary inheritance. SDK mocks are brittle. Protocol gives clean seam + substitutability. |
+| LocalFetcher first, defer GCSFetcher | Build both together; skip local | Building both adds dep before needed. Skipping local means no test-friendly implementation. |
+| DB-based checkpoints (`ingest_checkpoints` table) | File-based; no checkpoint | File can drift from DB. No checkpoint = wasteful re-ingestion. DB keeps all state in one place. |
+| Lexicographic blob ordering for checkpoint | Timestamp-based; sequence number | GCS sink blob names sort lexicographically by date. No extra parsing needed. |
+| Accept both `.json` and `.jsonl` in LocalFetcher | `.json` only; configurable | `.json` only skips existing fixtures. Configurable is over-engineering. |
+| `--local-dir` as new CLI option (not replacing `--file`) | Replace `--file`; add `--gcs-bucket` now | Replacing breaks existing usage. `--gcs-bucket` requires new dep — separate concern. |
+| Dismiss Dependabot alert (not fix) | Pin Pygments; ignore | No fixed version exists. Dismiss with rationale is correct. |
+| Keep feature branches after merge | Delete with `--delete-branch` | User preference — learnings on each branch worth revisiting. |
+
+**CLAUDE.md Exceptions**
+- No exceptions this session.
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| Stale `.pyc` caused phantom test failure | `test_all_10_tables_created` appeared to fail despite correct source. Clearing `__pycache__` resolved. | Watch — if recurs, add cache cleanup to pre-test workflow. |
+| `known_initiators` loaded but unused in `--local-dir` CLI path | Wasted work, confusing code | Fixed in review — moved loading into only branches that use `_ingest_file`. |
+| `_ingest_content` (fetch.py) duplicates `_ingest_file` (cli.py) | Two parse→enrich→insert loops | Deferred — consolidate when `--file` deprecated in favor of `--local-dir`. |
+| Copilot and Claude converge again | 1 of 6 Copilot comments matched Claude finding (`.jsonl` extension) | Pattern holds from PR #6. Convergence = high confidence signal. |
+
+**Open Questions**
+1. trigger_ref viability — fetch pipeline ready, run experiment next session (carried forward).
+2. Parser redundant provenance logic (parser.py:165-167) — clean up (carried forward).
+3. Signal normalization method — defer to Sprint 1 (carried forward).
+4. EXFIL_RISK zone patterns — real GCP data now available for tuning (carried forward).
+5. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1) (carried forward).
+6. 4 deferred review nits from PR #7 — fix when adding `--gcs-bucket`.
+7. 7 deferred Copilot nits from PR #6 — fix on `fix/` branch.
+8. Stale `.pyc` causing phantom test failures — watch for recurrence.
+
+**CLAUDE.md Evolution Candidates**
+1. "Clear `__pycache__` when schema/test renames cause phantom failures" — **watch**.
+
+---
+
 ### 2026-03-24 — Production — PR #6 merge + session handoff
 
 **Session Summary**
