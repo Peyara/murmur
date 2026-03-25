@@ -1,7 +1,13 @@
 # Gitleaks configuration for Murmur
 # https://github.com/gitleaks/gitleaks
+#
+# Extends the default ruleset (generic API keys, AWS, GCP, etc.)
+# so scanning is never accidentally empty.
 
 title = "Murmur gitleaks config"
+
+[extend]
+  useDefault = true
 
 # Allowlist paths that contain intentional test/example credentials
 [allowlist]

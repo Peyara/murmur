@@ -168,9 +168,11 @@ policy['auditConfigs'] = [{
 }]
 json.dump(policy, sys.stdout, indent=2)
 ")
-    echo "$UPDATED_POLICY" > /tmp/murmur-iam-policy.json
-    gcloud projects set-iam-policy "$PROJECT_ID" /tmp/murmur-iam-policy.json --quiet
-    rm -f /tmp/murmur-iam-policy.json
+    TMP_POLICY_FILE="$(mktemp "${TMPDIR:-/tmp}/murmur-iam-policy.XXXXXX.json")"
+    trap 'rm -f "$TMP_POLICY_FILE"' EXIT
+    echo "$UPDATED_POLICY" > "$TMP_POLICY_FILE"
+    gcloud projects set-iam-policy "$PROJECT_ID" "$TMP_POLICY_FILE" --quiet
+    rm -f "$TMP_POLICY_FILE"
     echo "    Data Access audit logs enabled."
 fi
 
@@ -207,7 +209,7 @@ info "6/8" "Deploying Cloud Run service: $SERVICE ..."
 gcloud run deploy "$SERVICE" \
     --image=us-docker.pkg.dev/cloudrun/container/hello \
     --region="$REGION" \
-    --allow-unauthenticated \
+    --no-allow-unauthenticated \
     --max-instances=1 \
     --project="$PROJECT_ID" \
     --quiet
