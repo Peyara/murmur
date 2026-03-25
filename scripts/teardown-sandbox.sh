@@ -8,7 +8,7 @@
 # Usage:
 #   bash scripts/teardown-sandbox.sh
 #
-# This script asks for confirmation before each destructive step.
+# This script asks for confirmation once before starting teardown.
 # =============================================================================
 
 set -euo pipefail
@@ -72,7 +72,8 @@ gcloud logging sinks delete murmur-audit-sink \
     --project="$PROJECT_ID" --quiet 2>/dev/null || echo "    Not found, skipping."
 
 info "Deleting GCS bucket and contents ..."
-gcloud storage rm -r "gs://$BUCKET" --project="$PROJECT_ID" 2>/dev/null || echo "    Not found, skipping."
+gcloud storage rm "gs://$BUCKET/**" --project="$PROJECT_ID" 2>/dev/null || true
+gcloud storage buckets delete "gs://$BUCKET" --project="$PROJECT_ID" --quiet 2>/dev/null || echo "    Not found, skipping."
 
 info "Deleting VM: $VM ..."
 gcloud compute instances delete "$VM" \

@@ -118,10 +118,10 @@ if gcloud logging sinks describe murmur-audit-sink --project="$PROJECT_ID" &>/de
     echo "    Sink already exists, skipping."
 else
     # Create the sink. gcloud prints the service account that needs bucket access.
-    SINK_OUTPUT=$(gcloud logging sinks create murmur-audit-sink \
+    gcloud logging sinks create murmur-audit-sink \
         "storage.googleapis.com/$BUCKET" \
         --log-filter='logName:"cloudaudit.googleapis.com"' \
-        --project="$PROJECT_ID" 2>&1)
+        --project="$PROJECT_ID"
     echo "    Sink created."
 
     # Extract the sink's service account and grant it write access.
@@ -152,7 +152,17 @@ info "4/8" "Enabling Data Access audit logs ..."
 # Fetch current policy, check if auditConfigs already set
 CURRENT_POLICY=$(gcloud projects get-iam-policy "$PROJECT_ID" --format=json 2>/dev/null)
 
-if echo "$CURRENT_POLICY" | python3 -c "import sys,json; p=json.load(sys.stdin); sys.exit(0 if 'auditConfigs' in p else 1)" 2>/dev/null; then
+if echo "$CURRENT_POLICY" | python3 -c "
+import sys, json
+p = json.load(sys.stdin)
+configs = p.get('auditConfigs', [])
+for c in configs:
+    if c.get('service') == 'allServices':
+        types = {e.get('logType') for e in c.get('auditLogConfigs', [])}
+        if 'DATA_READ' in types and 'DATA_WRITE' in types:
+            sys.exit(0)
+sys.exit(1)
+" 2>/dev/null; then
     echo "    Data Access audit logs already enabled, skipping."
 else
     # Add auditConfigs to the existing policy
