@@ -1,0 +1,11 @@
+# Gitleaks configuration for Murmur
+# https://github.com/gitleaks/gitleaks
+
+title = "Murmur gitleaks config"
+
+# Allowlist paths that contain intentional test/example credentials
+[allowlist]
+  description = "Test fixtures and examples with placeholder values"
+  paths = [
+    '''\.env\.example''',
+  ]

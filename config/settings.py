@@ -1,6 +1,7 @@
 """Centralized configuration for all Murmur parameters."""
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -16,8 +17,12 @@ class MurmurSettings:
     fixtures_dir: str = str(PROJECT_ROOT / "data" / "fixtures")
     known_initiators_path: str = str(CONFIG_DIR / "known_initiators.json")
 
+    # --- GCP (read from .env via environment variables) ---
+    gcp_project_id: str = field(default_factory=lambda: os.environ.get("GCP_PROJECT_ID", ""))
+    gcp_region: str = field(default_factory=lambda: os.environ.get("GCP_REGION", "us-central1"))
+
     # --- Ingestion ---
-    gcs_bucket: str = ""  # Populated in Phase 0B
+    gcs_bucket: str = field(default_factory=lambda: os.environ.get("GCS_AUDIT_BUCKET", ""))
     gcs_prefix: str = "cloudaudit.googleapis.com"
 
     # --- Windowing ---

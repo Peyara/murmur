@@ -1,8 +1,28 @@
+# Claude Code
 .claude/settings.local.json
+
+# macOS
 .DS_Store
+
+# Python
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
+
+# DuckDB
 *.duckdb
 *.duckdb.wal
-.pytest_cache/
+
+# Secrets and credentials — NEVER commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*-credentials.json
+*-key.json
+service-account*.json
+
+# GCP
+application_default_credentials.json
