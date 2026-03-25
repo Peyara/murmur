@@ -6,6 +6,45 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-24 — Production — Sprint 0B-2: GCP provisioning + security hardlines + sandbox scripts
+
+**Session Summary**
+- Mode: Production
+- Resolved prior auth blocker (new device, gcloud authenticated as samreen654@gmail.com). Installed uv, restored venv (84 tests green). Executed full GCP sandbox provisioning: 9 APIs enabled (revised list — dropped BigQuery/CloudBuild, added Compute/ArtifactRegistry), GCS bucket, audit log sink with SA permissions, Data Access audit logs enabled, 3 secrets, Cloud Run hello container, Cloud Scheduler job (every 5 min), $25 budget alert, e2-micro VM. All resources verified live. Audit logs confirmed flowing (9 files in bucket).
+- Added security hardlines: .gitignore credential patterns, .env/.env.example config separation, gitleaks pre-commit hook, CLAUDE.md security rule, settings.py env var wiring.
+- Created sandbox scripts: setup-sandbox.sh (idempotent, parameterized), teardown-sandbox.sh (with confirmation), sandbox-status.sh (on-demand health check). All auto-load .env.
+- Branch `feat/security-hardlines-sandbox-scripts` pushed. PR not yet created — blocked on `gh auth login` on new device.
+- Status: Branch pushed, PR pending.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Revised API list: drop BigQuery + CloudBuild, add Compute + ArtifactRegistry | Original 9 (with BQ + CloudBuild) | "Necessary and sufficient" — BQ not used (chose GCS sink), CloudBuild not needed for pre-built hello container. Compute needed for VM (was missing). ArtifactRegistry needed for Cloud Run image pulls. |
+| .env + .gitignore + gitleaks (defense in depth) | .gitignore only; Terraform secrets | Multiple independent layers — any single layer failing doesn't expose secrets. Terraform overkill for one sandbox. |
+| Shell scripts over Terraform for reproducibility | Terraform/OpenTofu; docs-only | One sandbox, ~10 resources. Terraform learning curve + state management not justified. Scripts double as bash learning material. Can graduate to Terraform later. |
+| Scripts auto-load .env (SCRIPT_DIR-based) | Require `source .env &&` prefix | User would forget the prefix. Auto-loading is ergonomic and reliable. |
+| sandbox-status.sh (on-demand) over monitoring agent | Persistent polling agent; GCP dashboard only | Polling agent generates its own audit logs (observer affects observed) and costs money. Dashboard requires context-switching. On-demand script is zero-cost. |
+| settings.py reads env vars via os.environ.get() | python-dotenv; separate config loader | os.environ.get() is stdlib — no new dependency. Dataclass stays single source of truth. |
+
+**CLAUDE.md Exceptions**
+- No exceptions this session.
+
+**Open Questions**
+1. trigger_ref viability — sandbox is live, can now run the experiment (carried forward).
+2. Parser redundant provenance logic (parser.py:165-167) — clean up (carried forward).
+3. Signal normalization method — defer to Sprint 1 (carried forward).
+4. EXFIL_RISK zone patterns — real GCP data now available for tuning (carried forward).
+5. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1) (carried forward).
+6. GitHub Dependabot alert (1 low severity) — check.
+7. `gh auth login` — needed on new device to create PRs.
+
+**CLAUDE.md Evolution Candidates**
+1. "Scripts auto-load .env" — standard pattern for all future scripts. **watch**
+2. "On-demand status scripts over persistent agents" — for sandbox observability. **watch**
+
+---
+
 ### 2026-03-24 — Production — Sprint 0B-2: GCP sandbox provisioning plan (blocked on auth)
 
 **Session Summary**
