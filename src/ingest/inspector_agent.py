@@ -17,8 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.ingest.inspector import InspectionReport, format_report
-
+from src.ingest.inspector import InspectionReport
 
 # --- Agent Configuration ---
 

@@ -11,7 +11,7 @@ import logging
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def _try_parse_timestamp(value: str) -> datetime | None:
         try:
             dt = datetime.strptime(value, fmt)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             return dt
         except ValueError:
             continue
@@ -79,6 +79,7 @@ class FieldStats:
     distinct_values: set = field(default_factory=set)
     value_types: Counter = field(default_factory=Counter)
     sample_values: list = field(default_factory=list)
+    cardinality_capped: bool = False
 
     @property
     def presence_rate(self) -> float:
@@ -90,7 +91,8 @@ class FieldStats:
 
     @property
     def cardinality_ratio(self) -> float:
-        """1.0 = unique per entry, 0.0 = same value everywhere."""
+        """1.0 = unique per entry, 0.0 = same value everywhere.
+        Approximate when cardinality_capped is True."""
         return self.cardinality / self.count if self.count else 0
 
     def dominant_type(self) -> str | None:
@@ -236,8 +238,10 @@ def inspect_logs(directory: str | Path, cluster_window_seconds: float = 30.0) ->
             stats.count += 1
 
             str_val = str(value) if value is not None else ""
-            if len(stats.distinct_values) < 1000:  # Cap memory
+            if len(stats.distinct_values) < 1000:
                 stats.distinct_values.add(str_val)
+            else:
+                stats.cardinality_capped = True
             if len(stats.sample_values) < 5:
                 stats.sample_values.append(str_val)
 
@@ -436,7 +440,7 @@ def format_report(report: InspectionReport) -> str:
         lines.append(f"  {count:4d}  {short}")
 
     # Field inventory (top fields by presence)
-    lines.append(f"\n--- Field Inventory (top 40 by presence) ---")
+    lines.append("\n--- Field Inventory (top 40 by presence) ---")
     sorted_fields = sorted(
         report.field_inventory.values(), key=lambda s: s.count, reverse=True
     )
@@ -453,13 +457,13 @@ def format_report(report: InspectionReport) -> str:
 
     # Timestamp fields
     if report.timestamp_fields:
-        lines.append(f"\n--- Timestamp Fields ---")
+        lines.append("\n--- Timestamp Fields ---")
         for tf in report.timestamp_fields:
             lines.append(f"  {tf}")
 
     # Actor candidates
     if report.actor_candidates:
-        lines.append(f"\n--- Actor Candidates ---")
+        lines.append("\n--- Actor Candidates ---")
         for path, card, samples in report.actor_candidates:
             lines.append(f"  {path}  (cardinality={card})")
             for s in samples:
@@ -467,7 +471,7 @@ def format_report(report: InspectionReport) -> str:
 
     # Target candidates
     if report.target_candidates:
-        lines.append(f"\n--- Target Candidates ---")
+        lines.append("\n--- Target Candidates ---")
         for path, card, samples in report.target_candidates:
             lines.append(f"  {path}  (cardinality={card})")
             for s in samples[:3]:
@@ -475,7 +479,7 @@ def format_report(report: InspectionReport) -> str:
 
     # Correlation candidates
     if report.correlation_candidates:
-        lines.append(f"\n--- Correlation Candidates (top 15) ---")
+        lines.append("\n--- Correlation Candidates (top 15) ---")
         for c in report.correlation_candidates[:15]:
             lines.append(f"  [{c.score:.2f}] {c.field_path}")
             lines.append(f"         type={c.evidence_type}  {c.details}")
