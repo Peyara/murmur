@@ -157,14 +157,13 @@ def parse_audit_log(raw: dict) -> CanonicalEvent:
     resource_labels = raw.get("resource", {}).get("labels", {})
     project_id = resource_labels.get("project_id")
 
-    # Provenance (basic — full extraction in Phase 0B)
+    # Provenance (basic — enrichment in provenance_ingest.py classifies source)
     metadata = raw.get("metadata", {})
     trigger_ref = metadata.get("trigger_ref")
     provenance_level = ProvenanceLevel.NONE
     provenance_source = ProvenanceSource.UNKNOWN
     if trigger_ref:
         provenance_level = ProvenanceLevel.WEAK
-        provenance_source = ProvenanceSource.CLOUD_SCHEDULER
 
     # Result
     status = payload.get("status", {})

@@ -106,6 +106,15 @@ class TestLocalFetcher:
         fetcher = LocalFetcher(str(tmp_path))
         assert fetcher.list_blobs() == ["data.json"]
 
+    def test_file_path_raises_valueerror(self, tmp_path):
+        file_path = tmp_path / "some_file.json"
+        file_path.write_text("{}")
+
+        from src.ingest.fetch import LocalFetcher
+
+        with pytest.raises(ValueError, match="not a directory"):
+            LocalFetcher(str(file_path))
+
 
 # ---------------------------------------------------------------------------
 # Checkpoint tests

@@ -37,8 +37,11 @@ if gcloud run services describe "$SERVICE" --region="$REGION" --project="$PROJEC
     echo "    Status: DEPLOYED"
     echo "    URL:    $URL"
     # Quick health check
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" 2>/dev/null || echo "UNREACHABLE")
-    echo "    Health: HTTP $HTTP_CODE"
+    if HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" 2>/dev/null); then
+        echo "    Health: HTTP $HTTP_CODE"
+    else
+        echo "    Health: UNREACHABLE"
+    fi
 else
     echo "    Status: NOT FOUND"
 fi
@@ -115,7 +118,16 @@ echo ""
 # ---- Data Access Audit Logs --------------------------------------------------
 echo "--- Data Access Audit Logs"
 HAS_AUDIT=$(gcloud projects get-iam-policy "$PROJECT_ID" --format=json 2>/dev/null | \
-    python3 -c "import sys,json; p=json.load(sys.stdin); print('ENABLED' if 'auditConfigs' in p else 'DISABLED')" 2>/dev/null || echo "UNKNOWN")
+    python3 -c "
+import sys, json
+p = json.load(sys.stdin)
+for c in p.get('auditConfigs', []):
+    if c.get('service') == 'allServices':
+        types = {e.get('logType') for e in c.get('auditLogConfigs', [])}
+        if 'DATA_READ' in types and 'DATA_WRITE' in types:
+            print('ENABLED'); sys.exit(0)
+print('DISABLED')
+" 2>/dev/null || echo "UNKNOWN")
 echo "    Status: $HAS_AUDIT"
 echo ""
 

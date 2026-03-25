@@ -49,6 +49,8 @@ class LocalFetcher:
 
     def __init__(self, directory: str) -> None:
         self._dir = Path(directory)
+        if self._dir.exists() and not self._dir.is_dir():
+            raise ValueError(f"Path is not a directory: {self._dir}")
 
     def list_blobs(self, prefix: str | None = None) -> list[str]:
         if not self._dir.exists():
