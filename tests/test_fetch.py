@@ -1,6 +1,7 @@
-"""Tests for GCS fetch pipeline — BlobSource protocol, LocalFetcher, checkpointing."""
+"""Tests for fetch pipeline — BlobSource protocol, LocalFetcher, GCSFetcher, checkpointing."""
 
 import json
+from unittest.mock import MagicMock, patch
 
 import duckdb
 import pytest
@@ -218,3 +219,137 @@ class TestFetchAndIngest:
         assert stats["inserted"] == 1
         assert stats["parse_errors"] == 1
         assert stats["blobs_processed"] == 1
+
+
+# ---------------------------------------------------------------------------
+# SingleFileFetcher tests
+# ---------------------------------------------------------------------------
+
+
+class TestSingleFileFetcher:
+    def test_list_blobs_returns_filename(self, tmp_path):
+        from src.ingest.fetch import SingleFileFetcher
+
+        f = tmp_path / "data.jsonl"
+        f.write_text("{}\n")
+        fetcher = SingleFileFetcher(str(f))
+        assert fetcher.list_blobs() == ["data.jsonl"]
+
+    def test_list_blobs_prefix_filter(self, tmp_path):
+        from src.ingest.fetch import SingleFileFetcher
+
+        f = tmp_path / "data.jsonl"
+        f.write_text("{}\n")
+        fetcher = SingleFileFetcher(str(f))
+        assert fetcher.list_blobs(prefix="data") == ["data.jsonl"]
+        assert fetcher.list_blobs(prefix="other") == []
+
+    def test_read_blob_returns_content(self, tmp_path):
+        from src.ingest.fetch import SingleFileFetcher
+
+        f = tmp_path / "data.jsonl"
+        f.write_text('{"key": "value"}\n')
+        fetcher = SingleFileFetcher(str(f))
+        assert fetcher.read_blob("data.jsonl") == '{"key": "value"}\n'
+
+    def test_read_blob_wrong_name_raises(self, tmp_path):
+        from src.ingest.fetch import SingleFileFetcher
+
+        f = tmp_path / "data.jsonl"
+        f.write_text("{}\n")
+        fetcher = SingleFileFetcher(str(f))
+        with pytest.raises(FileNotFoundError):
+            fetcher.read_blob("other.jsonl")
+
+    def test_nonexistent_file_raises(self):
+        from src.ingest.fetch import SingleFileFetcher
+
+        with pytest.raises(FileNotFoundError):
+            SingleFileFetcher("/nonexistent/file.jsonl")
+
+
+# ---------------------------------------------------------------------------
+# GCSFetcher tests (mocked — no real GCS calls)
+# ---------------------------------------------------------------------------
+
+
+class TestGCSFetcher:
+    def test_conforms_to_blobsource_protocol(self):
+        from src.ingest.fetch import BlobSource, GCSFetcher
+
+        with patch("google.cloud.storage.Client") as mock_client_cls:
+            mock_client_cls.return_value = MagicMock()
+            fetcher = GCSFetcher("test-bucket")
+            assert isinstance(fetcher, BlobSource)
+
+    def test_list_blobs_returns_sorted_names(self):
+        from src.ingest.fetch import GCSFetcher
+
+        with patch("google.cloud.storage.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client_cls.return_value = mock_client
+            mock_bucket = MagicMock()
+            mock_client.bucket.return_value = mock_bucket
+
+            # Simulate unsorted blob listing
+            blob_c = MagicMock()
+            blob_c.name = "c.json"
+            blob_a = MagicMock()
+            blob_a.name = "a.json"
+            blob_b = MagicMock()
+            blob_b.name = "b.json"
+            mock_bucket.list_blobs.return_value = [blob_c, blob_a, blob_b]
+
+            fetcher = GCSFetcher("test-bucket")
+            result = fetcher.list_blobs()
+            assert result == ["a.json", "b.json", "c.json"]
+            mock_bucket.list_blobs.assert_called_once_with(prefix=None)
+
+    def test_list_blobs_with_prefix(self):
+        from src.ingest.fetch import GCSFetcher
+
+        with patch("google.cloud.storage.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client_cls.return_value = mock_client
+            mock_bucket = MagicMock()
+            mock_client.bucket.return_value = mock_bucket
+            mock_bucket.list_blobs.return_value = []
+
+            fetcher = GCSFetcher("test-bucket")
+            fetcher.list_blobs(prefix="2026-03")
+            mock_bucket.list_blobs.assert_called_once_with(prefix="2026-03")
+
+    def test_read_blob_returns_text(self):
+        from src.ingest.fetch import GCSFetcher
+
+        with patch("google.cloud.storage.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client_cls.return_value = mock_client
+            mock_bucket = MagicMock()
+            mock_client.bucket.return_value = mock_bucket
+            mock_blob = MagicMock()
+            mock_bucket.blob.return_value = mock_blob
+            mock_blob.download_as_text.return_value = '{"event": "data"}\n'
+
+            fetcher = GCSFetcher("test-bucket")
+            content = fetcher.read_blob("file.json")
+            assert content == '{"event": "data"}\n'
+            mock_bucket.blob.assert_called_once_with("file.json")
+
+    def test_read_blob_nonexistent_raises_filenotfounderror(self):
+        from src.ingest.fetch import GCSFetcher
+
+        with patch("google.cloud.storage.Client") as mock_client_cls:
+            from google.cloud.exceptions import NotFound
+
+            mock_client = MagicMock()
+            mock_client_cls.return_value = mock_client
+            mock_bucket = MagicMock()
+            mock_client.bucket.return_value = mock_bucket
+            mock_blob = MagicMock()
+            mock_bucket.blob.return_value = mock_blob
+            mock_blob.download_as_text.side_effect = NotFound("not found")
+
+            fetcher = GCSFetcher("test-bucket")
+            with pytest.raises(FileNotFoundError):
+                fetcher.read_blob("nonexistent.json")

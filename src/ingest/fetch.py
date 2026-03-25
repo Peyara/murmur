@@ -72,6 +72,59 @@ class LocalFetcher:
 
 
 # ---------------------------------------------------------------------------
+# SingleFileFetcher — wraps a single file as a BlobSource
+# ---------------------------------------------------------------------------
+
+
+class SingleFileFetcher:
+    """BlobSource backed by a single file on disk."""
+
+    def __init__(self, file_path: str) -> None:
+        self._path = Path(file_path)
+        if not self._path.is_file():
+            raise FileNotFoundError(f"File not found: {self._path}")
+
+    def list_blobs(self, prefix: str | None = None) -> list[str]:
+        name = self._path.name
+        if prefix is not None and not name.startswith(prefix):
+            return []
+        return [name]
+
+    def read_blob(self, name: str) -> str:
+        if name != self._path.name:
+            raise FileNotFoundError(f"Blob not found: {name}")
+        return self._path.read_text()
+
+
+# ---------------------------------------------------------------------------
+# GCSFetcher — reads from a GCS bucket
+# ---------------------------------------------------------------------------
+
+
+class GCSFetcher:
+    """BlobSource backed by a Google Cloud Storage bucket."""
+
+    def __init__(self, bucket_name: str) -> None:
+        from google.cloud import storage
+
+        client = storage.Client()
+        self._bucket = client.bucket(bucket_name)
+
+    def list_blobs(self, prefix: str | None = None) -> list[str]:
+        blobs = self._bucket.list_blobs(prefix=prefix)
+        return sorted(b.name for b in blobs)
+
+    def read_blob(self, name: str) -> str:
+        from google.cloud.exceptions import NotFound
+
+        blob = self._bucket.blob(name)
+        try:
+            return blob.download_as_text()
+        except NotFound:
+            raise FileNotFoundError(f"Blob not found: {name}")
+
+
+# ---------------------------------------------------------------------------
 # Checkpoint — tracks last-processed blob per source in DuckDB
 # ---------------------------------------------------------------------------
 

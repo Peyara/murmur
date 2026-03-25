@@ -205,3 +205,57 @@ class TestIngestLocalDir:
         result = runner.invoke(cli, ["ingest", "--local-dir", str(tmp_path), "--db-path", tmp_db])
         assert result.exit_code == 0
         assert "0 blobs" in result.output
+
+
+class TestIngestMutualExclusivity:
+    def test_multiple_sources_rejected(self, runner, tmp_db, tmp_path):
+        """Passing more than one source option should fail."""
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+        result = runner.invoke(
+            cli, ["ingest", "--sample", "--local-dir", str(tmp_path), "--db-path", tmp_db]
+        )
+        assert result.exit_code != 0
+        assert "mutually exclusive" in result.output.lower() or "mutually exclusive" in (result.stderr or "").lower()
+
+    def test_no_source_shows_usage(self, runner, tmp_db):
+        """No source option should show usage help."""
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+        result = runner.invoke(cli, ["ingest", "--db-path", tmp_db])
+        assert result.exit_code != 0
+
+
+class TestIngestGcsBucket:
+    def test_gcs_bucket_calls_fetch_and_ingest(self, runner, tmp_db):
+        """--gcs-bucket wires GCSFetcher into fetch_and_ingest."""
+        from unittest.mock import MagicMock, patch
+
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+
+        mock_fetcher = MagicMock()
+        mock_stats = {"blobs_processed": 2, "inserted": 5, "skipped": 0, "parse_errors": 0}
+
+        with patch("src.cli.GCSFetcher", return_value=mock_fetcher) as mock_cls, \
+             patch("src.cli.fetch_and_ingest", return_value=mock_stats) as mock_fai:
+            result = runner.invoke(
+                cli, ["ingest", "--gcs-bucket", "my-bucket", "--db-path", tmp_db]
+            )
+            assert result.exit_code == 0
+            mock_cls.assert_called_once_with("my-bucket")
+            mock_fai.assert_called_once()
+            assert "5 inserted" in result.output
+
+
+class TestIngestFileValidation:
+    def test_file_rejects_directory(self, runner, tmp_db, tmp_path):
+        """--file with a directory path should fail (dir_okay=False)."""
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+        result = runner.invoke(cli, ["ingest", "--file", str(tmp_path), "--db-path", tmp_db])
+        assert result.exit_code != 0
+
+    def test_local_dir_rejects_file(self, runner, tmp_db, tmp_path):
+        """--local-dir with a file path should fail (file_okay=False)."""
+        f = tmp_path / "data.json"
+        f.write_text("{}")
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+        result = runner.invoke(cli, ["ingest", "--local-dir", str(f), "--db-path", tmp_db])
+        assert result.exit_code != 0

@@ -1,6 +1,5 @@
 """Murmur CLI — entry point for all commands."""
 
-import json
 import sys
 from pathlib import Path
 
@@ -8,10 +7,12 @@ import click
 import duckdb
 
 from config.settings import SETTINGS
-from src.ingest.dedup import insert_event
-from src.ingest.fetch import LocalFetcher, fetch_and_ingest
-from src.ingest.parser import parse_audit_log
-from src.ingest.provenance_ingest import enrich_provenance
+from src.ingest.fetch import (
+    GCSFetcher,
+    LocalFetcher,
+    SingleFileFetcher,
+    fetch_and_ingest,
+)
 
 
 @click.group()
@@ -41,76 +42,48 @@ def init_db(db_path: str | None):
 
 @cli.command("ingest")
 @click.option("--sample", is_flag=True, help="Ingest all fixture files from data/fixtures/.")
-@click.option("--file", "file_path", type=click.Path(exists=True), help="Ingest a single JSONL file.")
-@click.option("--local-dir", type=click.Path(exists=True), help="Ingest all JSON files from a local directory.")
+@click.option("--file", "file_path", type=click.Path(exists=True, dir_okay=False), help="Ingest a single JSONL file.")
+@click.option(
+    "--local-dir", type=click.Path(exists=True, file_okay=False), help="Ingest all JSON files from a local directory."
+)
+@click.option("--gcs-bucket", default=None, help="Ingest audit logs from a GCS bucket.")
 @click.option("--db-path", default=None, help="Path to DuckDB file.")
-def ingest(sample: bool, file_path: str | None, local_dir: str | None, db_path: str | None):
+def ingest(
+    sample: bool,
+    file_path: str | None,
+    local_dir: str | None,
+    gcs_bucket: str | None,
+    db_path: str | None,
+):
     """Ingest GCP audit log events into DuckDB."""
+    sources = sum(bool(s) for s in [sample, file_path, local_dir, gcs_bucket])
+    if sources > 1:
+        raise click.UsageError("Options --sample, --file, --local-dir, and --gcs-bucket are mutually exclusive.")
+    if sources == 0:
+        raise click.UsageError("Specify --sample, --file PATH, --local-dir DIR, or --gcs-bucket BUCKET.")
+
     db_path = db_path or SETTINGS.db_path
     conn = duckdb.connect(db_path)
     try:
-        if local_dir:
+        if gcs_bucket:
+            fetcher = GCSFetcher(gcs_bucket)
+            source_id = f"gcs:{gcs_bucket}"
+        elif local_dir:
             fetcher = LocalFetcher(local_dir)
-            stats = fetch_and_ingest(conn, fetcher, source_id=f"local:{local_dir}")
-            click.echo(
-                f"Local ingest complete: {stats['blobs_processed']} blobs, "
-                f"{stats['inserted']} inserted, {stats['skipped']} duplicates, "
-                f"{stats['parse_errors']} errors"
-            )
-
-        elif sample:
-            known_initiators = SETTINGS.load_known_initiators()
-            fixtures_dir = Path(SETTINGS.fixtures_dir)
-            files = sorted(fixtures_dir.glob("*.jsonl"))
-            if not files:
-                click.echo(f"No JSONL files found in {fixtures_dir}", err=True)
-                sys.exit(1)
-            total_inserted = 0
-            total_skipped = 0
-            for f in files:
-                inserted, skipped = _ingest_file(conn, f, known_initiators)
-                total_inserted += inserted
-                total_skipped += skipped
-            click.echo(f"Sample ingest complete: {total_inserted} inserted, {total_skipped} duplicates skipped")
-
+            source_id = f"local:{local_dir}"
         elif file_path:
-            known_initiators = SETTINGS.load_known_initiators()
-            inserted, skipped = _ingest_file(conn, Path(file_path), known_initiators)
-            click.echo(f"Ingest complete: {inserted} inserted, {skipped} duplicates skipped")
-
+            fetcher = SingleFileFetcher(file_path)
+            mtime = int(Path(file_path).stat().st_mtime)
+            source_id = f"file:{file_path}:{mtime}"
         else:
-            click.echo("Specify --sample, --file PATH, or --local-dir DIR", err=True)
-            sys.exit(1)
+            fetcher = LocalFetcher(str(Path(SETTINGS.fixtures_dir)))
+            source_id = "sample:fixtures"
+
+        stats = fetch_and_ingest(conn, fetcher, source_id=source_id)
+        click.echo(
+            f"Ingest complete: {stats['blobs_processed']} blobs, "
+            f"{stats['inserted']} inserted, {stats['skipped']} duplicates, "
+            f"{stats['parse_errors']} errors"
+        )
     finally:
         conn.close()
-
-
-def _ingest_file(
-    conn: duckdb.DuckDBPyConnection, path: Path, known_initiators: set[str]
-) -> tuple[int, int]:
-    """Parse, enrich provenance, and ingest a single JSONL file. Returns (inserted, skipped)."""
-    inserted = 0
-    skipped = 0
-    parse_errors = 0
-
-    with open(path) as f:
-        for line_num, line in enumerate(f, 1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                raw = json.loads(line)
-                event = parse_audit_log(raw)
-                event = enrich_provenance(event, known_initiators)
-                if insert_event(conn, event):
-                    inserted += 1
-                else:
-                    skipped += 1
-            except (json.JSONDecodeError, KeyError, ValueError) as e:
-                parse_errors += 1
-                click.echo(f"  Warning: {path.name}:{line_num} parse error: {e}", err=True)
-
-    if parse_errors:
-        click.echo(f"  {path.name}: {parse_errors} parse errors", err=True)
-
-    return inserted, skipped
