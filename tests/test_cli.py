@@ -207,6 +207,26 @@ class TestIngestLocalDir:
         assert "0 blobs" in result.output
 
 
+class TestInspect:
+    def test_inspect_runs_on_fixtures(self, runner):
+        """murmur inspect on fixtures directory produces a report."""
+        result = runner.invoke(cli, ["inspect", str(FIXTURES_DIR)])
+        assert result.exit_code == 0
+        assert "LOG INSPECTION REPORT" in result.output
+        assert "Total entries:" in result.output
+
+    def test_inspect_with_empty_dir(self, runner, tmp_path):
+        """murmur inspect on an empty directory produces an empty report."""
+        result = runner.invoke(cli, ["inspect", str(tmp_path)])
+        assert result.exit_code == 0
+        assert "Total entries: 0" in result.output
+
+    def test_inspect_nonexistent_dir(self, runner):
+        """murmur inspect on a nonexistent directory fails."""
+        result = runner.invoke(cli, ["inspect", "/nonexistent/path"])
+        assert result.exit_code != 0
+
+
 class TestIngestMutualExclusivity:
     def test_multiple_sources_rejected(self, runner, tmp_db, tmp_path):
         """Passing more than one source option should fail."""
