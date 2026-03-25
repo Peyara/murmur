@@ -26,3 +26,6 @@ service-account*.json
 
 # GCP
 application_default_credentials.json
+
+# Raw audit log inspection data (real logs, never commit)
+data/raw_inspection/

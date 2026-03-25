@@ -87,3 +87,19 @@ def ingest(
         )
     finally:
         conn.close()
+
+
+@cli.command("inspect")
+@click.argument("directory", type=click.Path(exists=True, file_okay=False))
+@click.option(
+    "--cluster-window",
+    default=30.0,
+    help="Temporal clustering window in seconds (default: 30).",
+)
+def inspect(directory: str, cluster_window: float):
+    """Inspect raw log files — discover structure, patterns, and correlations."""
+    from src.ingest.inspector import format_report, inspect_logs
+
+    click.echo(f"Inspecting logs in {directory} ...")
+    report = inspect_logs(directory, cluster_window_seconds=cluster_window)
+    click.echo(format_report(report))

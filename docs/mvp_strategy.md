@@ -179,6 +179,13 @@ Deferred components, ordered by value. Full details in `docs/post_mvp_roadmap.md
 | STRONG provenance | Needs Frame (Product 2) |
 | Docker terrarium | Not needed for parameterized generator |
 | Per-actor behavioral profiling | Needs 30+ days per-actor history |
+| Agent-driven ACTION_MAP discovery | See MVP Stretch Goals below |
+
+### MVP Stretch Goals
+
+| Goal | Description | Unlocked by |
+|---|---|---|
+| **Agent-driven ACTION_MAP discovery** | Use `inspect-interpret` agent to auto-discover service/method combinations from raw logs and propose ACTION_MAP entries. Makes the parser configuration-driven rather than hardcoded. Seed of cloud-agnostic onboarding. | Sprint 0B R&D (trigger_ref experiment). See `docs/rd_reports/2026-03-25_trigger_ref_discovery.md` Section 8.3. |
 
 ---
 
