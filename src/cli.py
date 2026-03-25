@@ -47,7 +47,6 @@ def init_db(db_path: str | None):
 def ingest(sample: bool, file_path: str | None, local_dir: str | None, db_path: str | None):
     """Ingest GCP audit log events into DuckDB."""
     db_path = db_path or SETTINGS.db_path
-    known_initiators = SETTINGS.load_known_initiators()
     conn = duckdb.connect(db_path)
     try:
         if local_dir:
@@ -60,6 +59,7 @@ def ingest(sample: bool, file_path: str | None, local_dir: str | None, db_path: 
             )
 
         elif sample:
+            known_initiators = SETTINGS.load_known_initiators()
             fixtures_dir = Path(SETTINGS.fixtures_dir)
             files = sorted(fixtures_dir.glob("*.jsonl"))
             if not files:
@@ -74,6 +74,7 @@ def ingest(sample: bool, file_path: str | None, local_dir: str | None, db_path: 
             click.echo(f"Sample ingest complete: {total_inserted} inserted, {total_skipped} duplicates skipped")
 
         elif file_path:
+            known_initiators = SETTINGS.load_known_initiators()
             inserted, skipped = _ingest_file(conn, Path(file_path), known_initiators)
             click.echo(f"Ingest complete: {inserted} inserted, {skipped} duplicates skipped")
 

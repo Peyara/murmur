@@ -54,7 +54,9 @@ class LocalFetcher:
         if not self._dir.exists():
             return []
         names = sorted(
-            f.name for f in self._dir.iterdir() if f.is_file() and f.suffix == ".json"
+            f.name
+            for f in self._dir.iterdir()
+            if f.is_file() and f.suffix in (".json", ".jsonl")
         )
         if prefix is not None:
             names = [n for n in names if n.startswith(prefix)]
