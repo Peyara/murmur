@@ -34,6 +34,13 @@ CREATE TABLE IF NOT EXISTS events (
     coverage_flag       BOOLEAN DEFAULT TRUE
 );
 
+-- Tracks last-processed blob per source for incremental ingestion
+CREATE TABLE IF NOT EXISTS ingest_checkpoints (
+    source_id       VARCHAR PRIMARY KEY,
+    last_blob_name  VARCHAR NOT NULL,
+    last_fetched_ts TIMESTAMP NOT NULL
+);
+
 -- ============================================================
 -- PROVENANCE LAYER (Sprint 1 scaffold, Sprint 3 full)
 -- ============================================================

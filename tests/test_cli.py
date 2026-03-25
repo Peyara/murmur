@@ -41,7 +41,7 @@ class TestInitDb:
             ).fetchall()
         ]
         conn.close()
-        assert len(tables) == 10
+        assert len(tables) == 11
         assert "events" in tables
 
     def test_idempotent(self, runner, tmp_db):
@@ -143,3 +143,65 @@ class TestIngestFile:
         runner.invoke(cli, ["init-db", "--db-path", tmp_db])
         result = runner.invoke(cli, ["ingest", "--file", "/nonexistent.jsonl", "--db-path", tmp_db])
         assert result.exit_code != 0
+
+
+class TestIngestLocalDir:
+    def test_ingests_from_directory(self, runner, tmp_db, tmp_path):
+        """--local-dir ingests all JSON files from a directory."""
+        import json
+
+        import duckdb
+
+        # Create a JSON file with 2 valid audit log events
+        events = [
+            {
+                "protoPayload": {
+                    "serviceName": "storage.googleapis.com",
+                    "methodName": "storage.objects.get",
+                    "authenticationInfo": {"principalEmail": "sa@project.iam.gserviceaccount.com"},
+                    "resourceName": f"projects/_/buckets/b/objects/f{i}.csv",
+                    "status": {},
+                },
+                "resource": {"type": "gcs_bucket", "labels": {"project_id": "test"}},
+                "timestamp": f"2026-03-22T00:0{i}:00.000Z",
+                "insertId": f"i-{i}",
+                "logName": "projects/test/logs/cloudaudit.googleapis.com%2Fdata_access",
+            }
+            for i in range(2)
+        ]
+        (tmp_path / "batch.json").write_text("\n".join(json.dumps(e) for e in events))
+
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+        result = runner.invoke(cli, ["ingest", "--local-dir", str(tmp_path), "--db-path", tmp_db])
+        assert result.exit_code == 0
+        assert "2 inserted" in result.output
+
+        conn = duckdb.connect(tmp_db)
+        count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        conn.close()
+        assert count == 2
+
+    def test_idempotent_local_dir(self, runner, tmp_db, tmp_path):
+        """Second --local-dir run processes 0 blobs due to checkpointing."""
+        import json
+
+        event = {
+            "protoPayload": {
+                "serviceName": "storage.googleapis.com",
+                "methodName": "storage.objects.get",
+                "authenticationInfo": {"principalEmail": "sa@project.iam.gserviceaccount.com"},
+                "resourceName": "projects/_/buckets/b/objects/f.csv",
+                "status": {},
+            },
+            "resource": {"type": "gcs_bucket", "labels": {"project_id": "test"}},
+            "timestamp": "2026-03-22T00:00:00.000Z",
+            "insertId": "i-1",
+            "logName": "projects/test/logs/cloudaudit.googleapis.com%2Fdata_access",
+        }
+        (tmp_path / "data.json").write_text(json.dumps(event))
+
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+        runner.invoke(cli, ["ingest", "--local-dir", str(tmp_path), "--db-path", tmp_db])
+        result = runner.invoke(cli, ["ingest", "--local-dir", str(tmp_path), "--db-path", tmp_db])
+        assert result.exit_code == 0
+        assert "0 blobs" in result.output
