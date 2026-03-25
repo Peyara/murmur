@@ -38,6 +38,13 @@ Proceed? (yes / no / modify)
 
 **ML-specific:** NEVER modify a random seed, data split, or default model parameter without flagging as a reproducibility-affecting change requiring sign-off.
 
+**Secrets & credentials — NEVER commit to the repo:**
+- `.env` files with real values (only `.env.example` with placeholders)
+- GCP service account key files (`*-credentials.json`, `*-key.json`)
+- Real GCP project IDs, service account emails, or resource URLs in source code (use env vars via `config/settings.py`)
+- Private keys, API tokens, or any credential material
+- If in doubt, check `.gitignore` and run `gitleaks detect` before committing
+
 **At session start:** confirm active environment (local / staging / production) before any write op.
 
 ---
