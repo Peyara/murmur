@@ -9,6 +9,7 @@ import duckdb
 
 from config.settings import SETTINGS
 from src.ingest.dedup import insert_event
+from src.ingest.fetch import LocalFetcher, fetch_and_ingest
 from src.ingest.parser import parse_audit_log
 from src.ingest.provenance_ingest import enrich_provenance
 
@@ -41,14 +42,24 @@ def init_db(db_path: str | None):
 @cli.command("ingest")
 @click.option("--sample", is_flag=True, help="Ingest all fixture files from data/fixtures/.")
 @click.option("--file", "file_path", type=click.Path(exists=True), help="Ingest a single JSONL file.")
+@click.option("--local-dir", type=click.Path(exists=True), help="Ingest all JSON files from a local directory.")
 @click.option("--db-path", default=None, help="Path to DuckDB file.")
-def ingest(sample: bool, file_path: str | None, db_path: str | None):
+def ingest(sample: bool, file_path: str | None, local_dir: str | None, db_path: str | None):
     """Ingest GCP audit log events into DuckDB."""
     db_path = db_path or SETTINGS.db_path
     known_initiators = SETTINGS.load_known_initiators()
     conn = duckdb.connect(db_path)
     try:
-        if sample:
+        if local_dir:
+            fetcher = LocalFetcher(local_dir)
+            stats = fetch_and_ingest(conn, fetcher, source_id=f"local:{local_dir}")
+            click.echo(
+                f"Local ingest complete: {stats['blobs_processed']} blobs, "
+                f"{stats['inserted']} inserted, {stats['skipped']} duplicates, "
+                f"{stats['parse_errors']} errors"
+            )
+
+        elif sample:
             fixtures_dir = Path(SETTINGS.fixtures_dir)
             files = sorted(fixtures_dir.glob("*.jsonl"))
             if not files:
@@ -67,7 +78,7 @@ def ingest(sample: bool, file_path: str | None, db_path: str | None):
             click.echo(f"Ingest complete: {inserted} inserted, {skipped} duplicates skipped")
 
         else:
-            click.echo("Specify --sample or --file PATH", err=True)
+            click.echo("Specify --sample, --file PATH, or --local-dir DIR", err=True)
             sys.exit(1)
     finally:
         conn.close()

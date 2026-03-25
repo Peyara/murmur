@@ -41,7 +41,7 @@ class TestInitDb:
             ).fetchall()
         ]
         conn.close()
-        assert len(tables) == 10
+        assert len(tables) == 11
         assert "events" in tables
 
     def test_idempotent(self, runner, tmp_db):

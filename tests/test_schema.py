@@ -58,12 +58,12 @@ class TestSchemaCreation:
         ]
         assert table_name in tables
 
-    def test_all_10_tables_created(self, db):
+    def test_all_11_tables_created(self, db):
         tables = db.execute(
             "SELECT table_name FROM information_schema.tables "
             "WHERE table_schema = 'main'"
         ).fetchall()
-        assert len(tables) == 10
+        assert len(tables) == 11
 
     def test_events_table_has_primary_key(self, db):
         # Inserting duplicate event_id should fail
