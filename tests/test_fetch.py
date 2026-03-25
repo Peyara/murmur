@@ -277,17 +277,17 @@ class TestGCSFetcher:
     def test_conforms_to_blobsource_protocol(self):
         from src.ingest.fetch import BlobSource, GCSFetcher
 
-        with patch("src.ingest.fetch.storage") as mock_storage:
-            mock_storage.Client.return_value = MagicMock()
+        with patch("google.cloud.storage.Client") as mock_client_cls:
+            mock_client_cls.return_value = MagicMock()
             fetcher = GCSFetcher("test-bucket")
             assert isinstance(fetcher, BlobSource)
 
     def test_list_blobs_returns_sorted_names(self):
         from src.ingest.fetch import GCSFetcher
 
-        with patch("src.ingest.fetch.storage") as mock_storage:
+        with patch("google.cloud.storage.Client") as mock_client_cls:
             mock_client = MagicMock()
-            mock_storage.Client.return_value = mock_client
+            mock_client_cls.return_value = mock_client
             mock_bucket = MagicMock()
             mock_client.bucket.return_value = mock_bucket
 
@@ -308,9 +308,9 @@ class TestGCSFetcher:
     def test_list_blobs_with_prefix(self):
         from src.ingest.fetch import GCSFetcher
 
-        with patch("src.ingest.fetch.storage") as mock_storage:
+        with patch("google.cloud.storage.Client") as mock_client_cls:
             mock_client = MagicMock()
-            mock_storage.Client.return_value = mock_client
+            mock_client_cls.return_value = mock_client
             mock_bucket = MagicMock()
             mock_client.bucket.return_value = mock_bucket
             mock_bucket.list_blobs.return_value = []
@@ -322,9 +322,9 @@ class TestGCSFetcher:
     def test_read_blob_returns_text(self):
         from src.ingest.fetch import GCSFetcher
 
-        with patch("src.ingest.fetch.storage") as mock_storage:
+        with patch("google.cloud.storage.Client") as mock_client_cls:
             mock_client = MagicMock()
-            mock_storage.Client.return_value = mock_client
+            mock_client_cls.return_value = mock_client
             mock_bucket = MagicMock()
             mock_client.bucket.return_value = mock_bucket
             mock_blob = MagicMock()
@@ -339,11 +339,11 @@ class TestGCSFetcher:
     def test_read_blob_nonexistent_raises_filenotfounderror(self):
         from src.ingest.fetch import GCSFetcher
 
-        with patch("src.ingest.fetch.storage") as mock_storage:
+        with patch("google.cloud.storage.Client") as mock_client_cls:
             from google.cloud.exceptions import NotFound
 
             mock_client = MagicMock()
-            mock_storage.Client.return_value = mock_client
+            mock_client_cls.return_value = mock_client
             mock_bucket = MagicMock()
             mock_client.bucket.return_value = mock_bucket
             mock_blob = MagicMock()

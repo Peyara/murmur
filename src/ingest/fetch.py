@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import duckdb
-from google.cloud import storage
 
 from config.settings import SETTINGS
 from src.ingest.dedup import insert_event
@@ -106,6 +105,8 @@ class GCSFetcher:
     """BlobSource backed by a Google Cloud Storage bucket."""
 
     def __init__(self, bucket_name: str) -> None:
+        from google.cloud import storage
+
         client = storage.Client()
         self._bucket = client.bucket(bucket_name)
 

@@ -43,7 +43,9 @@ def init_db(db_path: str | None):
 @cli.command("ingest")
 @click.option("--sample", is_flag=True, help="Ingest all fixture files from data/fixtures/.")
 @click.option("--file", "file_path", type=click.Path(exists=True, dir_okay=False), help="Ingest a single JSONL file.")
-@click.option("--local-dir", type=click.Path(exists=True), help="Ingest all JSON files from a local directory.")
+@click.option(
+    "--local-dir", type=click.Path(exists=True, file_okay=False), help="Ingest all JSON files from a local directory."
+)
 @click.option("--gcs-bucket", default=None, help="Ingest audit logs from a GCS bucket.")
 @click.option("--db-path", default=None, help="Path to DuckDB file.")
 def ingest(
@@ -56,11 +58,9 @@ def ingest(
     """Ingest GCP audit log events into DuckDB."""
     sources = sum(bool(s) for s in [sample, file_path, local_dir, gcs_bucket])
     if sources > 1:
-        click.echo("Error: options --sample, --file, --local-dir, and --gcs-bucket are mutually exclusive.", err=True)
-        sys.exit(1)
+        raise click.UsageError("Options --sample, --file, --local-dir, and --gcs-bucket are mutually exclusive.")
     if sources == 0:
-        click.echo("Specify --sample, --file PATH, --local-dir DIR, or --gcs-bucket BUCKET", err=True)
-        sys.exit(1)
+        raise click.UsageError("Specify --sample, --file PATH, --local-dir DIR, or --gcs-bucket BUCKET.")
 
     db_path = db_path or SETTINGS.db_path
     conn = duckdb.connect(db_path)
@@ -73,7 +73,8 @@ def ingest(
             source_id = f"local:{local_dir}"
         elif file_path:
             fetcher = SingleFileFetcher(file_path)
-            source_id = f"file:{file_path}"
+            mtime = int(Path(file_path).stat().st_mtime)
+            source_id = f"file:{file_path}:{mtime}"
         else:
             fetcher = LocalFetcher(str(Path(SETTINGS.fixtures_dir)))
             source_id = "sample:fixtures"

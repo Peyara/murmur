@@ -251,3 +251,11 @@ class TestIngestFileValidation:
         runner.invoke(cli, ["init-db", "--db-path", tmp_db])
         result = runner.invoke(cli, ["ingest", "--file", str(tmp_path), "--db-path", tmp_db])
         assert result.exit_code != 0
+
+    def test_local_dir_rejects_file(self, runner, tmp_db, tmp_path):
+        """--local-dir with a file path should fail (file_okay=False)."""
+        f = tmp_path / "data.json"
+        f.write_text("{}")
+        runner.invoke(cli, ["init-db", "--db-path", tmp_db])
+        result = runner.invoke(cli, ["ingest", "--local-dir", str(f), "--db-path", tmp_db])
+        assert result.exit_code != 0
