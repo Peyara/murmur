@@ -4,15 +4,11 @@
 
 ## Active Sprint
 
-**Sprint 0B: GCP Provisioning** — 0B-2 GCP sandbox fully provisioned. Security hardlines + reproducibility scripts on branch, PR pending.
+**Sprint 0B: GCP Provisioning** — Infrastructure provisioned. PR #6 merged. Next: fetch.py + trigger_ref experiment.
 
 ## Last Completed Milestone
 
-Sprint 0B-2 (2026-03-24): GCP sandbox fully provisioned (9 APIs, GCS bucket, audit log sink, Data Access logs, 3 secrets, Cloud Run, Cloud Scheduler, e2-micro VM). Audit logs confirmed flowing (9 files in bucket). Security hardlines added (.gitignore, .env pattern, gitleaks, CLAUDE.md rule). Sandbox scripts created (setup, teardown, status). 84 tests green.
-
-## Current Blocker
-
-`gh` CLI not authenticated on this device. Branch `feat/security-hardlines-sandbox-scripts` is pushed but PR not yet created. Run `gh auth login` to authenticate, then create PR.
+Sprint 0B-2 (2026-03-24): PR #6 merged to main. GCP sandbox fully provisioned (9 APIs, GCS bucket, audit log sink, Data Access logs, 3 secrets, Cloud Run, Cloud Scheduler, e2-micro VM). Security hardlines added (.gitignore, .env pattern, gitleaks, pre-commit hook, CLAUDE.md rule). Sandbox scripts created (setup, teardown, status). 4 review warnings fixed. 84 tests green.
 
 ## GCP Sandbox Status (all live)
 
@@ -23,20 +19,20 @@ Sprint 0B-2 (2026-03-24): GCP sandbox fully provisioned (9 APIs, GCS bucket, aud
 | Logging sink `murmur-audit-sink` | Active, routing to bucket |
 | Data Access audit logs | Enabled (DATA_READ + DATA_WRITE) |
 | Secrets (low/medium/high) | Created |
-| Cloud Run `normal-worker` | Deployed, HTTP 200 |
-| Cloud Scheduler `trigger-normal-worker` | Firing every 5 min, succeeding |
+| Cloud Run `normal-worker` | Deployed, requires auth (--no-allow-unauthenticated) |
+| Cloud Scheduler `trigger-normal-worker` | Firing every 5 min |
 | Budget alert ($25) | Set via console |
-| VM `murmur-vm` (e2-micro) | Running, 34.173.237.254 |
+| VM `murmur-vm` (e2-micro) | Running |
 
 ## Open Blockers / Questions
 
-1. `gh auth login` — needed to create PR (immediate)
-2. trigger_ref viability — Sprint 0B critical experiment (sandbox is live, can now test)
-3. Parser redundant provenance logic (parser.py:165-167) — clean up
-4. Signal normalization method — decide during Sprint 1
-5. EXFIL_RISK zone patterns — tune with real GCP data (data now available)
-6. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1)
-7. GitHub Dependabot alert (1 low severity) — check https://github.com/Peyara/murmur/security/dependabot/1
+1. 7 Copilot nits from PR #6 — fix on `fix/` branch before next sprint
+2. GitHub Dependabot alert (1 low severity) — check
+3. trigger_ref viability — Sprint 0B critical experiment (sandbox ready)
+4. Parser redundant provenance logic (parser.py:165-167) — clean up
+5. Signal normalization method — decide during Sprint 1
+6. EXFIL_RISK zone patterns — tune with real GCP data
+7. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1)
 
 ## Files to Read for Context
 
@@ -49,10 +45,8 @@ Sprint 0B-2 (2026-03-24): GCP sandbox fully provisioned (9 APIs, GCS bucket, aud
 
 ## What To Do Next
 
-1. Authenticate `gh` CLI: `gh auth login`
-2. Create PR for `feat/security-hardlines-sandbox-scripts` branch
-3. Merge PR after review
-4. Build `src/ingest/fetch.py` (GCS fetch with pagination, reads from bucket)
-5. Add `ingest_checkpoints` table + `--gcs-bucket` CLI command
-6. Run trigger_ref experiment with real audit logs. Measure parse rate (target >90%).
-7. Check Dependabot alert
+1. Fix 7 Copilot nits on `fix/` branch, merge
+2. Check Dependabot alert
+3. Build `src/ingest/fetch.py` (GCS fetch with pagination, reads from bucket)
+4. Add `ingest_checkpoints` table + `--gcs-bucket` CLI command
+5. Run trigger_ref experiment with real audit logs. Measure parse rate (target >90%).

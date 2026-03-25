@@ -6,26 +6,20 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
-### 2026-03-24 — Production — Sprint 0B-2: GCP provisioning + security hardlines + sandbox scripts
+### 2026-03-24 — Production — PR #6 merge + session handoff
 
 **Session Summary**
 - Mode: Production
-- Resolved prior auth blocker (new device, gcloud authenticated as samreen654@gmail.com). Installed uv, restored venv (84 tests green). Executed full GCP sandbox provisioning: 9 APIs enabled (revised list — dropped BigQuery/CloudBuild, added Compute/ArtifactRegistry), GCS bucket, audit log sink with SA permissions, Data Access audit logs enabled, 3 secrets, Cloud Run hello container, Cloud Scheduler job (every 5 min), $25 budget alert, e2-micro VM. All resources verified live. Audit logs confirmed flowing (9 files in bucket).
-- Added security hardlines: .gitignore credential patterns, .env/.env.example config separation, gitleaks pre-commit hook, CLAUDE.md security rule, settings.py env var wiring.
-- Created sandbox scripts: setup-sandbox.sh (idempotent, parameterized), teardown-sandbox.sh (with confirmation), sandbox-status.sh (on-demand health check). All auto-load .env.
-- Branch `feat/security-hardlines-sandbox-scripts` pushed. PR not yet created — blocked on `gh auth login` on new device.
-- Status: Branch pushed, PR pending.
+- Generated PR description for PR #6 (`feat/security-hardlines-sandbox-scripts`). Merged PR #6 to main (squash merge, feature branch deleted). Resolved merge conflicts in session handoff files.
+- Status: Complete. PR #6 merged. Main branch up to date.
 
 **Decisions**
 
 | Decision | Alternatives considered | Why rejected |
 |---|---|---|
-| Revised API list: drop BigQuery + CloudBuild, add Compute + ArtifactRegistry | Original 9 (with BQ + CloudBuild) | "Necessary and sufficient" — BQ not used (chose GCS sink), CloudBuild not needed for pre-built hello container. Compute needed for VM (was missing). ArtifactRegistry needed for Cloud Run image pulls. |
-| .env + .gitignore + gitleaks (defense in depth) | .gitignore only; Terraform secrets | Multiple independent layers — any single layer failing doesn't expose secrets. Terraform overkill for one sandbox. |
-| Shell scripts over Terraform for reproducibility | Terraform/OpenTofu; docs-only | One sandbox, ~10 resources. Terraform learning curve + state management not justified. Scripts double as bash learning material. Can graduate to Terraform later. |
-| Scripts auto-load .env (SCRIPT_DIR-based) | Require `source .env &&` prefix | User would forget the prefix. Auto-loading is ergonomic and reliable. |
-| sandbox-status.sh (on-demand) over monitoring agent | Persistent polling agent; GCP dashboard only | Polling agent generates its own audit logs (observer affects observed) and costs money. Dashboard requires context-switching. On-demand script is zero-cost. |
-| settings.py reads env vars via os.environ.get() | python-dotenv; separate config loader | os.environ.get() is stdlib — no new dependency. Dataclass stays single source of truth. |
+| Squash merge for PR #6 | Regular merge (preserve 2 commits) | 2 commits are one logical unit (initial + review fixes). Clean main history. Consistent with Sprint 0A merge precedent. |
+| Stash-then-merge to handle dirty working tree | Commit handoff files first; checkout --force | Committing would create noise. Force checkout loses changes. Stash is the standard pattern. |
+| Resolve stash conflicts with `--theirs` (main's version) | Manual conflict resolution | Handoff files are overwritten by `/session-end` anyway. No content to preserve. |
 
 **CLAUDE.md Exceptions**
 - No exceptions this session.
@@ -36,12 +30,58 @@ For current state / resume point, see `CURRENT_STATE.md`.
 3. Signal normalization method — defer to Sprint 1 (carried forward).
 4. EXFIL_RISK zone patterns — real GCP data now available for tuning (carried forward).
 5. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1) (carried forward).
-6. GitHub Dependabot alert (1 low severity) — check.
-7. `gh auth login` — needed on new device to create PRs.
+6. GitHub Dependabot alert (1 low severity) — check (carried forward).
+7. 7 remaining Copilot nits on PR #6 — fix on `fix/` branch before next sprint (carried forward).
 
 **CLAUDE.md Evolution Candidates**
-1. "Scripts auto-load .env" — standard pattern for all future scripts. **watch**
-2. "On-demand status scripts over persistent agents" — for sandbox observability. **watch**
+- No candidates this session.
+
+---
+
+### 2026-03-24 — Production — Sprint 0B-2: PR review, skill updates, peyara-standards install
+
+**Session Summary**
+- Mode: Production
+- Unblocked `gh` CLI auth (was already authenticated as Peyara on this device). Created PR #6 for security hardlines + sandbox scripts branch. Ran 4-layer PR review (Claude principal engineer + Copilot). Claude found 2 warnings, 12 nits. Copilot generated 11 inline comments. After deduplication: 4 unique warnings, 9 nits. Fixed all 4 warnings on branch (--no-allow-unauthenticated, mktemp+trap, gitleaks extend default rules, .pre-commit-config.yaml). Pushed fix commit.
+- Updated `/pr-review` skill in peyara-standards: added principal engineer persona, Copilot comment fetching, Dependabot alert check, diff size gate (>500 lines), regression check (test count vs main), auto-fix offer. Created PR #3, merged.
+- Ran `install.sh` on this device — all peyara-standards slash commands now symlinked to `~/.claude/commands/` (`/pr-review`, `/pr-notes`, `/session-end`, `/update-readme`).
+- Status: PR #6 open with review fixes applied. 7 Copilot nits remaining (non-blocking). Ready to merge.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| `--no-allow-unauthenticated` for Cloud Run | Keep `--allow-unauthenticated`; add comment explaining | Undermines the OIDC provenance experiment (trigger_ref). Auth required so scheduler identity appears in audit logs. |
+| `mktemp` + `trap` for IAM policy temp file | Keep fixed `/tmp/` path; pipe directly | Fixed path risks clobbering/exposure on concurrent runs. Piping complex JSON through set-iam-policy is fragile. mktemp+trap is the standard pattern. |
+| `[extend] useDefault = true` in gitleaks config | Add explicit `[[rules]]`; leave as-is | Without extend or rules, gitleaks scans nothing. Extend is one line and gets all default rules. |
+| `.pre-commit-config.yaml` for gitleaks hook | Document manual `gitleaks detect` command; defer | Hook is defense-in-depth. Without it, gitleaks config exists but never runs automatically. |
+| Fix warnings before merge, defer nits | Fix everything; defer everything | Warnings are real gaps (public endpoint, no scanning rules). Nits are cosmetic. Splitting keeps PR review focused. |
+| Squash merge for peyara-standards PR | Regular merge | Single-file change, one logical unit. Clean history. |
+
+**CLAUDE.md Exceptions**
+- No exceptions this session.
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| `install.sh` had never been run on this device | All custom slash commands (`/pr-review`, `/pr-notes`, `/session-end`) were unavailable | Ran install.sh — now symlinked. Add to new-device setup checklist. |
+| Copilot and Claude converge on same findings | 4 of 11 Copilot comments matched Claude warnings exactly | Convergence = high confidence. Deduplication in consolidated review table is the right pattern. |
+| Copilot reviews are available ~30s after requesting | Can fetch inline comments via `gh api` | Built into updated `/pr-review` skill. |
+| gitleaks pre-commit hook ran on first commit after adding `.pre-commit-config.yaml` | Confirmed working — scanned and found 0 leaks | Defense-in-depth layer is live. |
+
+**Open Questions**
+1. trigger_ref viability — sandbox is live, can now run the experiment (carried forward).
+2. Parser redundant provenance logic (parser.py:165-167) — clean up (carried forward).
+3. Signal normalization method — defer to Sprint 1 (carried forward).
+4. EXFIL_RISK zone patterns — real GCP data now available for tuning (carried forward).
+5. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1) (carried forward).
+6. GitHub Dependabot alert (1 low severity) — check.
+7. 7 remaining Copilot nits on PR #6 — fix before or after merge.
+
+**CLAUDE.md Evolution Candidates**
+1. "Run `install.sh` on new device" — add to project onboarding checklist. **promote**
+2. "Deduplicate review findings across sources" — built into `/pr-review` skill. **done**
 
 ---
 
