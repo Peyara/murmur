@@ -6,6 +6,48 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-24 — Production — Fix deferred review nits PR #6 + PR #7 (PR #8)
+
+**Session Summary**
+- Mode: Production
+- Fixed 9 deferred review nits from PRs #6 and #7 on `fix/pr6-pr7-review-nits` branch. 7 shell script/env fixes, 1 LocalFetcher `is_dir()` validation + test, 1 parser provenance cleanup (removed redundant CLOUD_SCHEDULER assumption). PR #8 created, reviewed (0 blockers, 0 warnings, 2 nits), squash merged. 103 tests green.
+- Status: Complete. All deferred nits resolved. Main up to date.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Fix 8 of 11 nits now, defer 3 to GCSFetcher | Fix all 11; defer all | 3 nits (click.Path, mutual exclusivity, _ingest_content duplication) naturally belong to GCSFetcher CLI work. Fixing now creates throwaway code. |
+| Include parser provenance cleanup in fix branch | Keep separate; defer again | Carried 4 sessions. Small change, same scope. No reason to keep deferring. |
+| Remove CLOUD_SCHEDULER assumption, keep WEAK level | Remove both; keep both | WEAK is correct (trigger_ref = weak provenance). CLOUD_SCHEDULER is wrong (could be Cloud Build). Enrichment handles classification. |
+| Remove unwired env vars from .env.example | Wire into scripts; leave as docs | Scripts derive via gcloud. Wiring adds complexity. Misleading examples confuse users. |
+| Two-step bucket deletion (objects then bucket) | Single rm -r; add --force | `gcloud storage rm -r` can fail to delete the bucket itself. Two-step is reliable. |
+| Single commit for all 9 fixes | One per fix | All from same review, related scope. Single atomic commit cleaner. |
+
+**CLAUDE.md Exceptions**
+- No exceptions this session.
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| Copilot didn't respond to PR #8 review request within 30s | Review proceeded without Copilot layer | Non-blocking — Copilot is optional layer. May respond later. |
+| Audit log check logic duplicated across setup + status scripts | Maintenance burden if check logic changes | Acceptable for independent scripts — NIT, no action. |
+| Parser tests didn't assert provenance_source at all | Made CLOUD_SCHEDULER removal safe — no test updates needed | Good: enrichment tests cover source classification thoroughly. |
+
+**Open Questions**
+1. trigger_ref viability — Sprint 0B critical experiment, pipeline ready (carried forward).
+2. Signal normalization method — defer to Sprint 1 (carried forward).
+3. EXFIL_RISK zone patterns — tune with real GCP data (carried forward).
+4. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1) (carried forward).
+5. 3 deferred PR #7 nits — click.Path constraints, mutual exclusivity, _ingest_content duplication — fix with GCSFetcher.
+6. Stale .pyc causing phantom test failures — watch for recurrence (carried forward).
+
+**CLAUDE.md Evolution Candidates**
+1. "Batch related nits into single fix branch + single commit" — **watch**.
+
+---
+
 ### 2026-03-24 — Production — Sprint 0B-3: fetch pipeline + checkpointing (PR #7)
 
 **Session Summary**
