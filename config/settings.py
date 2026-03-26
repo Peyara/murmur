@@ -63,7 +63,7 @@ class MurmurSettings:
     # --- Correlation (Sprint 1) ---
     # Maps Cloud Run service_name → expected worker SA email
     service_worker_map: dict[str, str] = field(default_factory=lambda: {
-        # Populated from env or config once real services are deployed
+        "normal-worker": "normal-worker-sa@project-1f4f13c5-912e-45ae-b8a.iam.gserviceaccount.com",
     })
 
     # --- Trigger chain ---

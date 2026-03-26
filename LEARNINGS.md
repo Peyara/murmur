@@ -6,6 +6,43 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-26 — Production — Sprint 1A Session B: activity generator deployed, correlation validated on real data
+
+**Session Summary**
+- Mode: Production
+- Deployed real Cloud Run worker (reads secret + GCS input, writes GCS output) replacing hello-world container. Added hourly health check + daily cleanup scheduler jobs. Ran ad-hoc human activity.
+- Validated end-to-end correlation on real GCP audit logs: 8/8 worker events correlated with confidence 0.9998-1.0. Causal chain Scheduler→CloudRun→AuditEvents proven working.
+- 24h observation clock started: 2026-03-26T20:30 UTC.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Realistic baseline only — no manufactured invariant triggers | Hourly SA key creation to exercise INV_002 | Confirmation bias. Key creation belongs in Sprint 1B attack injection, not baseline. |
+| Single worker SA for all endpoints (/, /health, /cleanup) | Separate SAs per endpoint | Realistic — health checks and cleanup run as the service, not as a different identity. |
+| 3 endpoints on 1 Cloud Run service | 3 separate Cloud Run services | Simpler. Same SA, same permissions. Scheduler jobs target different URL paths. |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| Correlation works on real data: 0.9998-1.0 confidence | Core thesis validated — causal chain reconstruction is feasible | 24h observation clock started |
+| GCS sink batches hourly, ~15 min delivery delay after hour close | Worst-case detection latency is ~75 min | Fine for MVP signal validation. Production real-time needs Cloud Logging API (streaming). Track as architecture decision for post-MVP. |
+| Hydration validator reports mismatch when deploy noise dominates | Human activity (deploy, manual commands) outnumbered 2 worker invocations | Self-resolves as worker invocations accumulate. Validator is working correctly — it needs more data. |
+| Cloud Build deploy generates ~40 Docker-related audit events | One-time deploy noise. Introduces new SA (`serverless-robot-prod`) and methods (`Docker-*`) not in ACTION_MAP | These map to OTHER/DATA currently. Consider adding Docker-* to ACTION_MAP or excluding build artifacts. |
+| Cloud Build API had to be enabled + default SA needed storage.admin | `--source` deploy requires Cloud Build + Artifact Registry permissions | One-time setup cost. Document in provisioning script. |
+| `known_initiators.json` needed both real and fixture SAs | Updating to real SA broke fixture-based tests | Keep both entries. Test fixtures use placeholder SA, production uses real SA. |
+| Worker produces SECRET→DATA→DATA→DATA per invocation | Only 2 zone types in regular flux. Zone diversity comes from human ad-hoc + future attacks. | Correct by design — realistic baseline is stable, not diverse. Diversity = anomaly signal. |
+| `storage.objects.list` appears in worker flow (from `list_blobs()`) | GCS_LIST action now exercised in real data — Sprint 1A ACTION_MAP expansion was needed | Validated the ACTION_MAP expansion decision. |
+
+**Open Questions**
+1. Detection latency: GCS sink (batch) vs Cloud Logging API (streaming) — post-MVP architecture decision
+2. Docker-* audit methods from Cloud Build — add to ACTION_MAP or filter?
+3. `storage.buckets.getStorageLayout` appears in human commands — unmapped method, maps to OTHER
+4. `google.logging.v2.LoggingServiceV2.ListLogEntries` — logging API read events from gcloud CLI, unmapped
+
+---
+
 ### 2026-03-26 — Production — Sprint 1A Session A: ingestion foundation + hydration design
 
 **Session Summary**
