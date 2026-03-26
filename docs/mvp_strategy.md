@@ -38,8 +38,8 @@ The build is the experiment. Each sprint validates a hypothesis. Failure is info
 |  Sprint 1                                                                |
 +--------------------------------------------------------------------------+
 |                         INGESTION LAYER                                   |
-|  [GCS Fetch] [Parser: 13 action types] [trigger_ref] [Dedup]            |
-|  Sprint 0                                                                |
+|  [Multi-format Parser] [Temporal Correlator] [Dedup] [Inspector]        |
+|  Sprint 0 (base) + Sprint 1 (multi-log + correlation)                   |
 +--------------------------------------------------------------------------+
 |                         INFRASTRUCTURE                                    |
 |  GCP Sandbox | DuckDB (embedded) | systemd | e2-micro VM                |
@@ -54,10 +54,14 @@ The build is the experiment. Each sprint validates a hypothesis. Failure is info
 ### Data Flow
 
 ```
-GCP Cloud Audit Logs
+GCP Cloud Audit Logs          Cloud Scheduler Logs       Cloud Run Request Logs
+(protoPayload)                (jsonPayload)              (httpRequest)
+        |                           |                          |
+        v                           v                          v
+   [GCS Bucket / Cloud Logging API] --fetch--> [Multi-format Parser]
         |
         v
-   [GCS Bucket] --fetch--> [Parser] --trigger_ref--> [Dedup] --> DuckDB events
+   [Temporal-Identity Correlator] --derive trigger_ref--> [Dedup] --> DuckDB events
         |
         v
    [15-min Windowing] --> actor_windows, edges_window, zone_flux_windows
@@ -81,6 +85,8 @@ GCP Cloud Audit Logs
    [Dashboard: Pulse + Flow Map + Lineage]
 ```
 
+**Note:** trigger_ref is a derived field, not parsed from raw logs. GCP does not propagate a native per-execution correlation ID from Cloud Scheduler into triggered actions. See `docs/rd_reports/2026-03-25_trigger_ref_discovery.md`.
+
 ---
 
 ## Causal Validation Chain
@@ -90,8 +96,9 @@ Each sprint tests a hypothesis. Each hypothesis depends on the previous one pass
 ```
 Sprint 0: Can we get data + establish provenance?
     |
-    +-- trigger_ref works? --YES--> WEAK provenance viable
-    |                       NO---> Design fallback before Sprint 3
+    +-- trigger_ref experiment DONE: no native ID exists.
+    |   Temporal-identity correlation is the design (MEDIUM confidence).
+    |   Multi-log ingestion required (3 log streams, 3 formats).
     v
 Sprint 1: Do core signals detect obvious attacks on real data?
     |
@@ -120,7 +127,7 @@ Sprint 4 (parallel from Sprint 1): Dashboard + investor demo
 | Sprint | Stack Layers Touched | Hypothesis | Duration |
 |--------|---------------------|-----------|----------|
 | 0: Foundation & Data | Infrastructure, Ingestion | Can we ingest GCP audit logs + establish trigger_ref? | 4-5 days |
-| 1: Core Detection | World Model, Scoring, Provenance (scaffold) | Do zone flux + sigma_coarse + invariants produce meaningful signal? | 6-7 days |
+| 1: Core Detection | Ingestion (extended), World Model, Scoring, Provenance (scaffold) | Do zone flux + sigma_coarse + invariants produce meaningful signal? | 8-9 days |
 | 2: Attack Robustness | Validation, Scoring (analysis) | Are physics signals robust across varied strategies? | 3-4 days |
 | 3: Provenance + Closure | Provenance (full), Scoring (closure), Policy | Does provenance subtraction + closure reduce FP? | 5-6 days |
 | 4: Dashboard (parallel) | Presentation | Can this be demonstrated to investors? | 5-6 days |
@@ -143,7 +150,9 @@ Week 1        Week 2        Week 3        Week 4        Week 5
 | Component | Stack Layer | Sprint | Why necessary |
 |---|---|---|---|
 | GCS ingestion + parser | Ingestion | 0 | No data = no experiment |
-| trigger_ref extraction | Ingestion | 0 | Foundation of WEAK provenance |
+| trigger_ref extraction | Ingestion | 0 | Foundation of WEAK provenance (experiment result: temporal correlation, not native) |
+| Multi-format parser + correlator | Ingestion | 1 | 3 log streams with different formats; trigger_ref derived by temporal-identity correlation |
+| Infrastructure event filtering | Ingestion | 1 | Logging SA meta-logs are 31% of entries; must filter or tag to avoid skewing signals |
 | DuckDB schema + CLI | Infrastructure | 0 | Storage + interface |
 | Zone flux 6x6 matrix | World Model | 1 | Core physics computation substrate |
 | sigma_coarse (Schnakenberg) | Scoring | 1 | THE core physics signal |
@@ -203,7 +212,11 @@ These were identified as bugs or risks in the original MVP plan and are correcte
 
 5. **STRONG provenance is a stub.** Interface defined, always returns "unverified." No discount logic built. Activates when Frame ships.
 
-6. **trigger_ref is the first hypothesis test.** Phase 0B treats it as an experiment, not a setup task. Fallback designed if native propagation fails.
+6. **trigger_ref experiment complete (Sprint 0B).** No native per-execution correlation ID exists in GCP audit logs. Temporal-identity correlation across 3 log streams is the production design, not a fallback. MEDIUM confidence — works well at low concurrency, degrades with concurrent executions. See `docs/rd_reports/2026-03-25_trigger_ref_discovery.md`.
+
+7. **Action type coverage matters, not just parse rate.** Sprint 0B showed 100% parse rate but only 34% action type coverage (66% → OTHER). If most events fall to OTHER/DATA zone, the zone flux matrix skews and invariants never fire. ACTION_MAP expansion is a prerequisite for Sprint 1's core hypothesis.
+
+8. **Infrastructure meta-logs must be filtered.** The logging SA writing audit log files to the GCS bucket generates 31% of all entries. These are DATA zone GCS_WRITE events from a single actor that will dominate the flux matrix and dilute per-window metrics. Filter at ingestion or tag as `is_infrastructure`.
 
 ---
 
@@ -215,10 +228,14 @@ murmur/
     cli.py                         # All CLI commands
     schema.py                      # CanonicalEvent dataclass, enums
     ingest/                        # INGESTION LAYER
-      fetch.py                     #   GCS fetch, pagination
+      fetch.py                     #   GCS fetch, pagination, checkpointing
       parser.py                    #   GCP audit log -> CanonicalEvent
+      multi_parser.py              #   Multi-format dispatcher (Sprint 1)
+      correlate.py                 #   Temporal-identity correlation (Sprint 1)
       provenance_ingest.py         #   trigger_ref extraction, provenance_level
       dedup.py                     #   Idempotent deduplication
+      inspector.py                 #   Cloud-agnostic log structure/pattern discovery
+      inspector_agent.py           #   Agentic interpretation prompt builder
     world/                         # WORLD MODEL LAYER
       window.py                    #   15-min windowing, actor_windows, edges
       graph.py                     #   Zone flux 6x6 matrix, net currents, bridges
@@ -269,8 +286,8 @@ murmur/
 
 ## MVP Definition of Done
 
-1. **Pipeline operational:** Real GCP audit logs ingested every 15 min. Parse >90%.
-2. **Core signals producing value:** sigma_coarse + invariants + novelty show non-trivial variance on real data.
+1. **Pipeline operational:** 3 GCP log streams (audit, scheduler, Cloud Run) ingested every 15 min. Parse rate >90% per stream. Action type coverage >80%.
+2. **Core signals producing value:** sigma_coarse + invariants + novelty show non-trivial variance on real data (with infrastructure meta-logs filtered).
 3. **Robustness validated:** >80% detection rate across parameterized attack grid.
 4. **Provenance working:** 1+ registered pattern reduces residual_risk for matched activity.
 5. **Closure active:** closure_ratio + orphaned_privilege producing meaningful signal.

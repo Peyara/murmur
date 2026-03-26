@@ -6,7 +6,7 @@ Are the physics-informed signals (sigma_coarse, invariants, novelty, bridge_new,
 
 ## Prerequisites
 
-Sprint 1 complete. Signal validation gate passed. sigma_coarse produces meaningful variance on real data. Core detector working.
+Sprint 1 complete. Signal validation gate passed. sigma_coarse produces meaningful variance on real data. Core detector working. Multi-log ingestion + temporal-identity correlation operational (trigger_ref derived, not parsed).
 
 ## Stack Layers
 
@@ -82,6 +82,7 @@ The parameterized attack generator systematically covers the strategy space with
 
 - [ ] Generator produces valid events (zone mappings correct, timestamps ordered, action types valid)
 - [ ] Generated trajectories inject correctly into DuckDB
+  - Note: synthetic events bypass the temporal-identity correlation pipeline. trigger_ref is set directly on CanonicalEvent for attack/benign scenarios. Correlation is an ingestion concern tested in Sprint 1, not re-validated here.
 - [ ] Scoring pipeline handles synthetic events identically to real events
 - [ ] Robustness report generation runs without errors
 

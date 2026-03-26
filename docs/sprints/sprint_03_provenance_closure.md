@@ -8,6 +8,8 @@ Does provenance subtraction (residual_risk = total signal - authorized signal) r
 
 Sprint 1 + 2 complete. Core signals validated on real data. Robustness validated across attack parameter grid. We know which attacks the physics signals catch and which they miss.
 
+**Sprint 0B context:** trigger_ref is derived via temporal-identity correlation (MEDIUM confidence), not parsed from raw logs. The correlation module (`src/ingest/correlate.py`) is operational from Sprint 1. trigger_chain resolution in this sprint depends on that module's output.
+
 ## Stack Layers
 
 - **Provenance (full):** pattern matching, trigger chain, residual risk computation
@@ -41,8 +43,10 @@ Together, these transform Murmur from "anomaly detector" to "authorized world mo
 
 - [ ] `src/provenance/trigger_chain.py` (extend):
   - Full trigger chain resolution with known_initiators set
-  - Populate known_initiators.json from actual sandbox Cloud Scheduler/Build IDs
-  - Integration test: real scheduled event -> trigger chain resolves -> provenance_level = WEAK
+  - Depends on `src/ingest/correlate.py` — trigger_ref is derived, not parsed. Chain resolution starts from the correlated trigger_ref.
+  - known_initiators.json populated with real scheduler SA (loaded via env var)
+  - Integration test: real scheduled event (all 3 log streams ingested) -> correlation -> trigger chain resolves -> provenance_level = WEAK
+  - **Design decision:** Should correlation_confidence (MEDIUM for temporal, HIGH for hypothetical native ID) feed into the chain resolution? Or is provenance_level (WEAK) sufficient? Currently: provenance_level is the discount factor, correlation_confidence is implicit.
 
 - [ ] `src/provenance/residual.py` (extend):
   - Full residual risk formula:
@@ -143,7 +147,12 @@ Together, these transform Murmur from "anomaly detector" to "authorized world mo
 
 ## Findings Log
 
-_Updated as work progresses:_
+**Sprint 0B carryforward:**
+- trigger_ref is derived via temporal-identity correlation (MEDIUM confidence). No native per-execution correlation ID in GCP.
+- Correlation degrades with concurrent executions, scheduler retries, and SA reuse across services.
+- Full evidence: `docs/rd_reports/2026-03-25_trigger_ref_discovery.md`
+
+_Sprint 3 findings updated as work progresses:_
 
 ---
 
