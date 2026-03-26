@@ -8,7 +8,7 @@ These are NOT CanonicalEvents — they're correlation metadata.
 from dataclasses import dataclass
 from datetime import datetime
 
-from src.ingest.parser import _parse_timestamp
+from src.ingest.parser import parse_timestamp
 
 
 @dataclass
@@ -50,12 +50,12 @@ def parse_scheduler_log(raw: dict) -> SchedulerExecution:
     job_id = raw.get("resource", {}).get("labels", {}).get("job_id", job_name.rsplit("/", 1)[-1])
 
     # Timestamp (required)
-    ts = _parse_timestamp(raw["timestamp"])
+    ts = parse_timestamp(raw["timestamp"])
 
     # Scheduled time (only on AttemptStarted)
     scheduled_time = None
     if "scheduledTime" in payload:
-        scheduled_time = _parse_timestamp(payload["scheduledTime"])
+        scheduled_time = parse_timestamp(payload["scheduledTime"])
 
     # HTTP status (only on AttemptFinished with httpRequest)
     http_status = None

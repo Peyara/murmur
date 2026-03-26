@@ -237,31 +237,41 @@ def _ingest_content(
 
 
 def _parse_blob_entries(content: str) -> list[dict]:
-    """Parse blob content as NDJSON or JSON array. Returns list of raw dicts."""
+    """Parse blob content as NDJSON or JSON array. Returns only dict entries."""
     content = content.strip()
     if not content:
         return []
 
+    entries: list[dict] = []
+
     # Try NDJSON first (most common for GCS sink)
     if content.startswith("{"):
-        entries = []
-        for line in content.split("\n"):
+        for line_num, line in enumerate(content.split("\n"), 1):
             line = line.strip()
-            if line:
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                logger.warning("NDJSON line %d: parse error, skipping", line_num)
+                continue
+            if isinstance(obj, dict):
+                entries.append(obj)
+            else:
+                logger.warning("NDJSON line %d: expected object, got %s", line_num, type(obj).__name__)
         return entries
 
     # Try JSON array
     if content.startswith("["):
         try:
             data = json.loads(content)
-            if isinstance(data, list):
-                return data
         except json.JSONDecodeError:
-            pass
+            return []
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    entries.append(item)
+            return entries
 
     return []
 

@@ -88,7 +88,8 @@ def _link_scheduler_to_cloudrun(
     Match criteria:
       - Cloud Run user_agent is "Google-Cloud-Scheduler" (is_scheduler_invoked)
       - Cloud Run timestamp is within window after scheduler scheduled_time
-      - URL match (scheduler target_url matches Cloud Run request_url)
+      - URL match preferred (scheduler target_url matches Cloud Run request_url),
+        falls back to closest-in-time if no URL match exists
     """
     started = [s for s in scheduler_entries if s.attempt_type == "AttemptStarted" and s.scheduled_time]
     scheduler_invoked = [cr for cr in cloudrun_entries if cr.is_scheduler_invoked]
@@ -97,9 +98,10 @@ def _link_scheduler_to_cloudrun(
     used_cloudrun: set[str] = set()  # track by insert_id to avoid double-matching
 
     for sched in sorted(started, key=lambda s: s.scheduled_time):
-        best_cr: CloudRunRequest | None = None
-        best_gap = _SCHED_TO_CLOUDRUN_WINDOW.total_seconds()
-        url_match = False
+        best_url_cr: CloudRunRequest | None = None
+        best_url_gap = _SCHED_TO_CLOUDRUN_WINDOW.total_seconds()
+        best_any_cr: CloudRunRequest | None = None
+        best_any_gap = _SCHED_TO_CLOUDRUN_WINDOW.total_seconds()
 
         for cr in scheduler_invoked:
             if cr.insert_id in used_cloudrun:
@@ -107,16 +109,22 @@ def _link_scheduler_to_cloudrun(
             gap = (cr.timestamp - sched.scheduled_time).total_seconds()
             if gap < 0 or gap > _SCHED_TO_CLOUDRUN_WINDOW.total_seconds():
                 continue
-            # URL match check
             cr_url_matches = (
                 sched.target_url is not None
                 and cr.request_url
                 and sched.target_url.rstrip("/") == cr.request_url.rstrip("/")
             )
-            if gap < best_gap or (gap == best_gap and cr_url_matches):
-                best_cr = cr
-                best_gap = gap
-                url_match = cr_url_matches
+            # Prefer URL-matching candidates; within each tier, pick closest
+            if cr_url_matches and gap < best_url_gap:
+                best_url_cr = cr
+                best_url_gap = gap
+            if gap < best_any_gap:
+                best_any_cr = cr
+                best_any_gap = gap
+
+        # URL match takes priority over temporal proximity
+        best_cr = best_url_cr or best_any_cr
+        url_match = best_url_cr is not None
 
         if best_cr:
             used_cloudrun.add(best_cr.insert_id)

@@ -8,7 +8,7 @@ These are NOT CanonicalEvents — they're correlation metadata.
 from dataclasses import dataclass
 from datetime import datetime
 
-from src.ingest.parser import _parse_timestamp
+from src.ingest.parser import parse_timestamp
 
 
 @dataclass
@@ -47,7 +47,7 @@ def parse_cloudrun_log(raw: dict) -> CloudRunRequest:
     resource_labels = raw.get("resource", {}).get("labels", {})
 
     # Timestamp (required)
-    ts = _parse_timestamp(raw["timestamp"])
+    ts = parse_timestamp(raw["timestamp"])
 
     # Latency parsing: "0.003066100s" -> float seconds
     latency_seconds = None

@@ -121,7 +121,7 @@ def _is_exfil_risk(resource_name: str, action_type: ActionType) -> bool:
     return False
 
 
-def _parse_timestamp(ts_str: str) -> datetime:
+def parse_timestamp(ts_str: str) -> datetime:
     """Parse GCP timestamp (ISO 8601 with Z suffix)."""
     ts_str = ts_str.rstrip("Z")
     # Handle variable fractional seconds
@@ -171,7 +171,7 @@ def parse_audit_log(raw: dict) -> CanonicalEvent:
 
     # Timestamp (required)
     ts_str = raw["timestamp"]
-    ts = _parse_timestamp(ts_str)
+    ts = parse_timestamp(ts_str)
     window_start = _floor_to_window(ts)
 
     # Insert ID
