@@ -4,48 +4,36 @@
 
 ## Active Sprint
 
-**Sprint 0B: GCP Provisioning** — Implementation complete. PR #9 open (GCSFetcher + CLI consolidation). Remaining: merge PR #9, trigger_ref experiment, parse rate validation.
+**Sprint 0B: GCP Provisioning** — COMPLETE. trigger_ref experiment done (no native ID — temporal correlation is the design). PR #10 merged. All sprint specs updated with findings cascade. Ready for Sprint 1.
 
 ## Last Completed Milestone
 
-PR #9 (2026-03-25): GCSFetcher + SingleFileFetcher, unified all CLI ingest paths through `fetch_and_ingest()`, fixed 3 deferred PR #7 nits + 3 review warnings. 118 tests green.
+Sprint 0B close (2026-03-26): trigger_ref experiment, cloud-agnostic inspector, inspect-interpret agent, 5 broken assumptions cascaded across all docs, peyara-standards v2.0 (3 new R&D disciplines). 121 tests green.
 
 ## GCP Sandbox Status (all live)
 
-| Resource | Status |
-|---|---|
-| 9 GCP APIs | Enabled |
-| GCS bucket `murmur-audit-logs-sandbox` | Created, audit logs flowing (9+ files) |
-| Logging sink `murmur-audit-sink` | Active, routing to bucket |
-| Data Access audit logs | Enabled (DATA_READ + DATA_WRITE) |
-| Secrets (low/medium/high) | Created |
-| Cloud Run `normal-worker` | Deployed, requires auth |
-| Cloud Scheduler `trigger-normal-worker` | Firing every 5 min |
-| Budget alert ($25) | Set via console |
-| VM `murmur-vm` (e2-micro) | Running |
+Cloud Scheduler firing every 5 min (hello-world container — to be replaced in Sprint 1 Day 0). 9 GCP APIs enabled. Audit logs flowing to GCS bucket. Scheduler/Cloud Run logs available via Cloud Logging API but NOT in GCS sink yet.
 
 ## Open Blockers / Questions
 
-1. trigger_ref viability — Sprint 0B critical experiment (pipeline ready, PR #9 must merge first)
-2. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1)
-3. Signal normalization method — decide during Sprint 1
-4. EXFIL_RISK zone patterns — tune with real GCP data
-5. `gh pr edit` blocked by Projects Classic deprecation — use REST API workaround
+1. Multi-format parser architecture — dispatcher vs single module (Sprint 1 design decision)
+2. correlation_confidence as CanonicalEvent field — Sprint 1 design decision
+3. Sink expansion vs Cloud Logging API fetcher — Sprint 1 design decision
+4. EXFIL_RISK pattern tuning — pending from issue #2
+5. known_initiators.json needs real scheduler SA via env var
 
 ## Files to Read for Context
 
-- **Active sprint spec:** `docs/sprints/sprint_00_foundation_data.md` (Phase 0B section)
-- **Fetch pipeline:** `src/ingest/fetch.py` (BlobSource protocol, LocalFetcher, SingleFileFetcher, GCSFetcher, checkpointing)
-- **CLI:** `src/cli.py` (unified ingest with 4 modes)
-- **Sprint 0A review follow-ups:** GitHub issue #2 (2 items remaining)
-- **MVP strategy + architecture:** `docs/mvp_strategy.md`
+- **Sprint 1 spec:** `docs/sprints/sprint_01_core_detection.md` (includes Day 0 activity generator, ingestion foundation, observation-first validation)
+- **R&D report:** `docs/rd_reports/2026-03-25_trigger_ref_discovery.md` (trigger_ref evidence, architecture implications)
+- **MVP strategy:** `docs/mvp_strategy.md` (updated data flow, causal chain, critical decisions)
+- **Peyara standards:** `~/Desktop/Peyara/CLAUDE.md` (v2.0 — observe first, no confirmation bias, learning loop)
 - **Latest learnings:** `LEARNINGS.md` (most recent entry at top)
 
 ## What To Do Next
 
-1. Merge PR #9 (squash merge)
-2. Run trigger_ref experiment with real audit logs (`murmur ingest --gcs-bucket murmur-audit-logs-sandbox`)
-3. Measure parse rate on real logs (target >90%)
-4. Manual inspection of 10+ parsed events for correctness
-5. Document trigger_ref findings — native propagation or fallback to temporal correlation
-6. Close Sprint 0B gate
+1. Sprint 1A Day 0: Deploy real Cloud Run worker (reads secret + GCS), maintenance script (hourly key rotation + IAM), manual human activity
+2. Sprint 1A Day 0: Run inspector on 24h of real activity BEFORE writing detection code
+3. Sprint 1A Days 1-2: Build multi-format parser dispatcher + temporal-identity correlator
+4. Sprint 1A Days 3-7: World model + scoring + provenance scaffold
+5. Sprint 1B: Observation-first validation (bias check criteria included)

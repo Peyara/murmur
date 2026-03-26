@@ -6,6 +6,76 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-26 — R&D — trigger_ref experiment + inspector + standards v2.0
+
+**Session Summary**
+- Mode: R&D
+- Ran the critical trigger_ref experiment: no native per-execution correlation ID in GCP audit logs. Temporal-identity correlation across 3 log streams is the mechanism (MEDIUM confidence). Built cloud-agnostic log inspector + custom Claude Code agent. Cascaded 5 broken assumptions across all sprint specs + MVP strategy. Codified 3 new R&D disciplines in peyara-standards v2.0.
+- Status: Sprint 0B COMPLETE. PR #10 merged. All docs updated. Ready for Sprint 1.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Multi-log ingestion (3 streams) | Audit-log-only + API on-demand; audit only | API adds runtime dep. Audit-only misses scheduler + Cloud Run signals. |
+| Temporal-identity correlation for trigger_ref | Native field; trace-based; IP-based | Field doesn't exist. Trace doesn't propagate (1/80). IP varies. |
+| Cloud-agnostic inspector (statistical) | Hardcoded GCP field checklist | Fragile, repeats "model before observe" mistake. |
+| Custom Claude Code agent for interpretation | Anthropic SDK; slash command | SDK = unnecessary dep. Slash command = wrong isolation. Agent = right pattern. |
+| Observation-first validation | Hypothesis-confirming (design tests for invariants) | Confirmation bias. Build landscapes, not test cases. |
+| Peyara-standards v2.0 | Keep findings project-specific | Principles generalize: observe first, no bias, learning loops. |
+
+**CLAUDE.md Exceptions**
+- "One feature per session" — R&D cascade, each piece followed from prior discovery. One-off.
+- "Tests before code" — Inspector is an R&D discovery tool. Inline validation tests added after. One-off.
+- "Never push to main" — Doc-only handoff files, per convention. One-off.
+
+**Self-Reflection Findings (Learning Loop)**
+
+Six specific findings abstracted into reusable principles:
+
+| # | Finding | Principle |
+|---|---|---|
+| 1 | Should have looked at real logs before writing fixtures | **Ground truth before modeling.** Sample real data before fixtures/schemas. |
+| 2 | Parse rate was misleading (100% rate, 66% → OTHER) | **Measure what matters.** Metrics must map to actual outcomes. |
+| 3 | Inspector should have preceded parser | **Discovery before implementation.** Tools to see before tools to act. |
+| 4 | Sandbox doesn't produce diverse signals | **Validate test environment against hypothesis.** Don't defer "generate data" as fallback. |
+| 5 | Multi-log constraint enables trace-based correlation | **Constraints contain upgrade paths.** Ask what it enables, not just prevents. |
+| 6 | Agent pattern discovered accidentally | **Match reasoning layer to context.** Dev-time → agent. Runtime → SDK. |
+
+**Meta-principle:** Observe → hypothesize → model. We inverted it (model → hypothesize → observe) and paid for it.
+
+**Confirmation bias catch:** We designed a synthetic workload that produces exactly the patterns our invariants check for — circular validation. Reframed Sprint 1 to observation-first: deploy workload, run inspector, observe landscape, THEN evaluate invariants against reality. Include unstructured human activity. Name blind spots.
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| trigger_ref (metadata field) does not exist in real GCP audit logs | Entire provenance enrichment pipeline built against phantom field | Temporal-identity correlation is the design. Sprint 1 builds correlate.py. |
+| Scheduler + Cloud Run invocations are NOT audit logs | 3 separate log streams with different structures, not in GCS sink | Multi-log ingestion required. Sprint 1 ingestion foundation block. |
+| GCP has 3 log formats (protoPayload, jsonPayload, httpRequest) | Parser handles only protoPayload | Multi-format dispatcher needed in Sprint 1. |
+| 66% of real audit log entries map to OTHER | Zone flux matrix skewed, invariants won't fire on real data | ACTION_MAP expansion is prerequisite for Sprint 1 hypothesis. |
+| Logging SA meta-logs are 31% of entries | Infrastructure noise dominates flux matrix | Keep in dataset, system must handle gracefully. |
+| root_trigger_id exists on Compute Engine ops | Proof GCP CAN propagate trigger IDs, just not for Scheduler | Notes trace-based correlation as an upgrade path. |
+| Sandbox is quiet after provisioning | Sprint 1B validation is vacuously true without injected activity | Day 0 activity generator added to Sprint 1. |
+
+**Open Questions**
+1. Multi-format parser architecture (dispatcher vs single module) — Sprint 1 design decision.
+2. correlation_confidence as a CanonicalEvent field — Sprint 1 design decision.
+3. Sink expansion vs Cloud Logging API fetcher — Sprint 1 design decision.
+4. EXFIL_RISK pattern tuning — still pending from issue #2.
+5. inspect-interpret agent permissionMode — verify acceptEdits resolves Bash access.
+
+**CLAUDE.md Evolution Candidates**
+1. "Observe before hypothesize" — **done** (peyara-standards v2.0).
+2. "No confirmation bias" — **done** (peyara-standards v2.0).
+3. "Learning loop" — **done** (peyara-standards v2.0).
+4. "Session-start assumption check" — **done** (peyara-standards v2.0).
+5. "PR notes lead with goal/outcome" — **done** (pr-notes skill).
+6. "RD reports as lab notebooks" — **watch**.
+7. "Custom agents for dev-time reasoning" — **watch**.
+
+---
+
 ### 2026-03-25 — Production — GCSFetcher + CLI consolidation (PR #9)
 
 **Session Summary**
