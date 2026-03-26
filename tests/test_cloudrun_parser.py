@@ -9,7 +9,7 @@ from src.ingest.cloudrun_parser import can_parse_cloudrun, parse_cloudrun_log
 
 def _make_cloudrun_request(
     service_name: str = "normal-worker",
-    request_url: str = "https://normal-worker-1013530516622.us-central1.run.app/",
+    request_url: str = "https://normal-worker-123456789.us-central1.run.app/",
     user_agent: str = "Google-Cloud-Scheduler",
     remote_ip: str = "107.178.194.161",
     status_code: int = 200,
@@ -18,7 +18,7 @@ def _make_cloudrun_request(
     trace: str = "projects/proj/traces/c0a64c0728fe0b7c290d63772ec2a646",
     span_id: str = "31b9db755942f73d",
     latency: str = "0.003066100s",
-    project_id: str = "project-1f4f13c5-912e-45ae-b8a",
+    project_id: str = "test-project",
 ) -> dict:
     return {
         "httpRequest": {
@@ -84,7 +84,7 @@ class TestParseCloudRunFields:
 
     def test_extracts_request_url(self):
         result = parse_cloudrun_log(_make_cloudrun_request())
-        assert result.request_url == "https://normal-worker-1013530516622.us-central1.run.app/"
+        assert result.request_url == "https://normal-worker-123456789.us-central1.run.app/"
 
     def test_extracts_user_agent(self):
         result = parse_cloudrun_log(_make_cloudrun_request())
@@ -120,7 +120,7 @@ class TestParseCloudRunFields:
 
     def test_extracts_project_id(self):
         result = parse_cloudrun_log(_make_cloudrun_request())
-        assert result.project_id == "project-1f4f13c5-912e-45ae-b8a"
+        assert result.project_id == "test-project"
 
     def test_is_scheduler_invoked_true(self):
         result = parse_cloudrun_log(_make_cloudrun_request(user_agent="Google-Cloud-Scheduler"))
