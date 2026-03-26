@@ -44,9 +44,11 @@ def make_event(**overrides) -> CanonicalEvent:
         result=EventResult.SUCCESS,
         provenance_level=ProvenanceLevel.NONE,
         provenance_source=ProvenanceSource.UNKNOWN,
+        correlation_confidence=0.0,
         env="sandbox",
         is_deploy=False,
         is_incident=False,
+        is_infrastructure=False,
         risk_tags="[]",
         coverage_flag=True,
     )

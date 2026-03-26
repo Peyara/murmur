@@ -4,9 +4,11 @@ Abstracts file discovery behind a BlobSource protocol so the same
 fetch_and_ingest() orchestrator works with local files (dev/test)
 and GCS (production). Checkpointing ensures idempotent re-runs.
 
-Pipeline: list_blobs → filter by checkpoint → read → parse → enrich → insert → update checkpoint
+Pipeline (single-format): list_blobs → filter → read → parse → enrich → insert → checkpoint
+Pipeline (multi-format): per-prefix fetch → dispatch parse → correlate → enrich → insert
 """
 
+import dataclasses
 import json
 import logging
 from datetime import UTC, datetime
@@ -16,9 +18,14 @@ from typing import Protocol, runtime_checkable
 import duckdb
 
 from config.settings import SETTINGS
+from src.ingest.cloudrun_parser import CloudRunRequest
+from src.ingest.correlate import ServiceWorkerMap, correlate_events
 from src.ingest.dedup import insert_event
+from src.ingest.multi_parser import dispatch_parse
 from src.ingest.parser import parse_audit_log
 from src.ingest.provenance_ingest import enrich_provenance
+from src.ingest.scheduler_parser import SchedulerExecution
+from src.schema import CanonicalEvent
 
 logger = logging.getLogger(__name__)
 
@@ -222,3 +229,140 @@ def _ingest_content(
             logger.warning("%s:%d parse error: %s", blob_name, line_num, e)
 
     return inserted, skipped, errors
+
+
+# ---------------------------------------------------------------------------
+# Multi-format pipeline helpers
+# ---------------------------------------------------------------------------
+
+
+def _parse_blob_entries(content: str) -> list[dict]:
+    """Parse blob content as NDJSON or JSON array. Returns list of raw dicts."""
+    content = content.strip()
+    if not content:
+        return []
+
+    # Try NDJSON first (most common for GCS sink)
+    if content.startswith("{"):
+        entries = []
+        for line in content.split("\n"):
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+        return entries
+
+    # Try JSON array
+    if content.startswith("["):
+        try:
+            data = json.loads(content)
+            if isinstance(data, list):
+                return data
+        except json.JSONDecodeError:
+            pass
+
+    return []
+
+
+def fetch_and_ingest_multi(
+    db: duckdb.DuckDBPyConnection,
+    source: BlobSource,
+    source_id_prefix: str,
+    prefixes: list[str] | None = None,
+    service_worker_map: ServiceWorkerMap | None = None,
+) -> dict:
+    """Multi-format fetch + correlate + ingest pipeline.
+
+    For each GCS prefix:
+      1. Fetch new blobs (using per-prefix checkpoints)
+      2. Parse using multi-format dispatcher
+    Then correlate scheduler + Cloud Run + audit events, and insert.
+
+    Returns stats dict with per-type counts.
+    """
+    if prefixes is None:
+        prefixes = SETTINGS.gcs_prefixes
+    if service_worker_map is None:
+        service_worker_map = SETTINGS.service_worker_map
+
+    known_initiators = SETTINGS.load_known_initiators()
+
+    # Collect parsed entries by type across all prefixes
+    all_scheduler: list[SchedulerExecution] = []
+    all_cloudrun: list[CloudRunRequest] = []
+    all_audit: list[CanonicalEvent] = []
+
+    stats = {
+        "blobs_processed": 0,
+        "audit_parsed": 0,
+        "scheduler_parsed": 0,
+        "cloudrun_parsed": 0,
+        "parse_errors": 0,
+        "inserted": 0,
+        "skipped": 0,
+        "correlated": 0,
+    }
+
+    # Phase 1: Fetch and parse from each prefix
+    for prefix in prefixes:
+        checkpoint_id = f"{source_id_prefix}:{prefix}"
+        checkpoint = get_checkpoint(db, checkpoint_id)
+        all_blobs = source.list_blobs(prefix=prefix)
+
+        if checkpoint is not None:
+            all_blobs = [b for b in all_blobs if b > checkpoint]
+
+        for blob_name in all_blobs:
+            logger.info("Processing blob: %s", blob_name)
+            content = source.read_blob(blob_name)
+            raw_entries = _parse_blob_entries(content)
+
+            for raw in raw_entries:
+                try:
+                    result = dispatch_parse(raw)
+                    if isinstance(result, SchedulerExecution):
+                        all_scheduler.append(result)
+                        stats["scheduler_parsed"] += 1
+                    elif isinstance(result, CloudRunRequest):
+                        all_cloudrun.append(result)
+                        stats["cloudrun_parsed"] += 1
+                    elif isinstance(result, CanonicalEvent):
+                        all_audit.append(result)
+                        stats["audit_parsed"] += 1
+                    else:
+                        stats["parse_errors"] += 1
+                except (KeyError, ValueError) as e:
+                    stats["parse_errors"] += 1
+                    logger.warning("%s parse error: %s", blob_name, e)
+
+            stats["blobs_processed"] += 1
+            set_checkpoint(db, checkpoint_id, blob_name)
+
+    # Phase 2: Correlate
+    correlation_results = correlate_events(
+        scheduler_entries=all_scheduler,
+        cloudrun_entries=all_cloudrun,
+        audit_events=all_audit,
+        service_worker_map=service_worker_map,
+    )
+
+    # Phase 3: Apply correlation, enrich, insert
+    for cr in correlation_results:
+        event = cr.event
+        if cr.trigger_ref:
+            event = dataclasses.replace(
+                event,
+                trigger_ref=cr.trigger_ref,
+                correlation_confidence=cr.correlation_confidence,
+            )
+            stats["correlated"] += 1
+
+        event = enrich_provenance(event, known_initiators)
+        if insert_event(db, event):
+            stats["inserted"] += 1
+        else:
+            stats["skipped"] += 1
+
+    return stats

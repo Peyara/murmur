@@ -6,6 +6,39 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-26 — Production — Sprint 1A Session A: ingestion foundation + hydration design
+
+**Session Summary**
+- Mode: Production
+- Built multi-format ingestion pipeline: 3 parsers (audit, scheduler, Cloud Run), temporal-identity correlator, multi-prefix fetch pipeline, infrastructure tagging. 210 tests green (was 121).
+- GCS sink expanded to capture all 3 log types. ACTION_MAP expanded from 13→22 entries.
+- Identified cold start problem in correlator → designed hydration period as first-class Murmur concept.
+- Key insight: Murmur is a self-learning system. The hydration period is the "observe before hypothesize" principle at the system level.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Scheduler/Cloud Run logs as correlation metadata, not CanonicalEvents | Parse into CanonicalEvents with new zone types | No natural actor-target-zone mapping; forces invented ActionTypes |
+| Correlation confidence as composite (identity 0.4, URL 0.3, ambiguity 0.2, temporal 0.1) | Temporal-only; binary match/no-match | Temporal proximity is weakest signal — structural matches are deterministic, timing is noisy |
+| Tag infrastructure, don't filter | Filter at ingestion; ignore | Filtering is lossy — need data for learning and auditing |
+| Hydration period as design feature, not limitation | Skip observation, deploy with static rules | Static rules produce false positives. Self-learning requires observation period. |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| Cold start is narrow: only identity mapping (service→SA) needs config or learning | Correlator hop 1 (sched→cloudrun) is fully deterministic from first event | Built validate_service_worker_map() to verify config against observations |
+| Hydration period is a first-class design concept | Investor-facing: time-to-value = deploy(1h) + hydrate(3x cadence) + baseline(24h) | Documented in CLAUDE.md and mvp_strategy.md |
+| Murmur is self-learning: murmurs of today power Murmur of tomorrow | Architecture principle, not just implementation detail | Framed as continuous self-validation, not one-time configuration |
+
+**Open Questions**
+1. Auto-discovery of service_worker_map (Sprint 2-3) — how many observation cycles needed for confident auto-mapping?
+2. Self-learning parser (Sprint 2-3) — config-driven parser from inspector+agent pipeline
+3. Correlation confidence weights need calibration against real latency distributions (Session C)
+
+---
+
 ### 2026-03-26 — R&D — trigger_ref experiment + inspector + standards v2.0
 
 **Session Summary**

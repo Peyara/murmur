@@ -198,6 +198,47 @@ Deferred components, ordered by value. Full details in `docs/post_mvp_roadmap.md
 
 ---
 
+## Onboarding & Time-to-Value
+
+Murmur is a self-learning system. It requires a **hydration period** when deployed to a new cloud environment. This is architecturally intentional — the system observes before it acts. The murmurs of today power the Murmur of tomorrow.
+
+### Why hydration is necessary
+
+Traditional security tools deploy static rules and start alerting on day 1. This produces false positives because the rules don't know what "normal" looks like in your environment. Murmur takes the opposite approach: it observes your environment first, learns the baseline, and then detects deviations from that baseline. The cost is a brief onboarding period. The payoff is zero false positives at steady state.
+
+### What Murmur learns during hydration
+
+- **Identity mappings:** Which service accounts belong to which Cloud Run services (validated via `validate_service_worker_map()`)
+- **Temporal cadences:** How often each scheduled job fires, what the normal timing distribution looks like
+- **Causal chains:** Which scheduler jobs trigger which services, which services call which APIs
+- **Zone flux baseline:** What "normal" cross-zone activity looks like — the steady-state currents of the system
+- **Actor patterns:** Who does what, when, and how often — the fingerprint of legitimate activity
+
+### Onboarding timeline
+
+| Phase | Duration | What happens | Output |
+|-------|----------|-------------|--------|
+| **Deploy** | ~1 hour | Connect log sink, configure initial service mappings | Logs flowing to Murmur |
+| **Hydrate** | 3x longest job cadence | Observe actors, cadences, causal chains | Identity mappings confirmed, cadence estimates, correlation operational |
+| **Baseline** | 24-48h | Build normal behavior profile across full diurnal cycle | Zone flux baseline, scoring calibration, sanctioned patterns registered |
+| **Operational** | Ongoing | Full detection, scoring, and continuous self-validation | Alerts, provenance chains, risk scores, drift detection |
+
+**Typical GCP environment** (5-min scheduled jobs + hourly maintenance): deploy in 1h, hydrate in 15 min, baseline in 24h. **Operational in ~25 hours.**
+
+**Environments with daily batch jobs**: deploy in 1h, hydrate in 3 days, baseline in 1 week.
+
+### Self-maintaining operation
+
+Murmur doesn't stop learning after hydration. It continuously:
+- Validates configured identity mappings against observed patterns (flags drift)
+- Discovers new services and proposes mappings without human intervention
+- Updates baseline patterns as the environment evolves
+- Distinguishes organic drift (new legitimate patterns) from adversarial injection
+
+This is not a system you configure once and hope it stays current. It's a system that listens, learns, and adapts — with human oversight at decision points.
+
+---
+
 ## Critical Design Decisions (from plan critique)
 
 These were identified as bugs or risks in the original MVP plan and are corrected in this build:

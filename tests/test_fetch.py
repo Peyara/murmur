@@ -1,6 +1,7 @@
 """Tests for fetch pipeline — BlobSource protocol, LocalFetcher, GCSFetcher, checkpointing."""
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import duckdb
@@ -353,3 +354,206 @@ class TestGCSFetcher:
             fetcher = GCSFetcher("test-bucket")
             with pytest.raises(FileNotFoundError):
                 fetcher.read_blob("nonexistent.json")
+
+
+# ---------------------------------------------------------------------------
+# Multi-format pipeline tests
+# ---------------------------------------------------------------------------
+
+
+def _make_scheduler_entry(scheduled_time: str = "2026-03-25T10:00:00Z") -> dict:
+    return {
+        "insertId": "sched-001",
+        "jsonPayload": {
+            "@type": "type.googleapis.com/google.cloud.scheduler.logging.AttemptStarted",
+            "jobName": "projects/p/locations/us-central1/jobs/trigger-worker",
+            "scheduledTime": scheduled_time,
+            "targetType": "HTTP",
+            "url": "https://worker-123.us-central1.run.app/",
+        },
+        "logName": "projects/p/logs/cloudscheduler.googleapis.com%2Fexecutions",
+        "receiveTimestamp": "2026-03-25T10:00:02Z",
+        "resource": {"labels": {"job_id": "trigger-worker", "location": "us-central1", "project_id": "p"}, "type": "cloud_scheduler_job"},
+        "severity": "INFO",
+        "timestamp": "2026-03-25T10:00:02Z",
+    }
+
+
+def _make_cloudrun_entry() -> dict:
+    return {
+        "httpRequest": {
+            "latency": "0.005s",
+            "protocol": "HTTP/1.1",
+            "remoteIp": "1.2.3.4",
+            "requestMethod": "GET",
+            "requestUrl": "https://worker-123.us-central1.run.app/",
+            "status": 200,
+            "userAgent": "Google-Cloud-Scheduler",
+        },
+        "insertId": "cr-001",
+        "labels": {},
+        "logName": "projects/p/logs/run.googleapis.com%2Frequests",
+        "receiveTimestamp": "2026-03-25T10:00:03Z",
+        "resource": {"labels": {"service_name": "worker", "project_id": "p"}, "type": "cloud_run_revision"},
+        "severity": "INFO",
+        "timestamp": "2026-03-25T10:00:03Z",
+    }
+
+
+def _make_worker_audit_event() -> dict:
+    return {
+        "protoPayload": {
+            "serviceName": "storage.googleapis.com",
+            "methodName": "storage.objects.get",
+            "authenticationInfo": {"principalEmail": "worker-sa@proj.iam.gserviceaccount.com"},
+            "resourceName": "projects/_/buckets/data/objects/input.json",
+            "status": {},
+        },
+        "resource": {"labels": {"project_id": "p"}},
+        "timestamp": "2026-03-25T10:00:05.000Z",
+        "insertId": "audit-001",
+        "logName": "projects/p/logs/cloudaudit.googleapis.com%2Fdata_access",
+    }
+
+
+@pytest.fixture
+def multi_format_dir(tmp_path):
+    """Temp directory with three subdirs simulating GCS prefix structure."""
+    audit_dir = tmp_path / "cloudaudit.googleapis.com"
+    audit_dir.mkdir()
+    sched_dir = tmp_path / "cloudscheduler.googleapis.com"
+    sched_dir.mkdir()
+    run_dir = tmp_path / "run.googleapis.com"
+    run_dir.mkdir()
+
+    # NDJSON audit log
+    (audit_dir / "data_access_01.json").write_text(json.dumps(_make_worker_audit_event()))
+
+    # NDJSON scheduler log
+    (sched_dir / "executions_01.json").write_text(json.dumps(_make_scheduler_entry()))
+
+    # NDJSON Cloud Run log
+    (run_dir / "requests_01.json").write_text(json.dumps(_make_cloudrun_entry()))
+
+    return tmp_path
+
+
+class _PrefixLocalFetcher:
+    """LocalFetcher variant that supports prefix-based subdirectory listing."""
+
+    def __init__(self, directory):
+        self._dir = Path(directory)
+
+    def list_blobs(self, prefix=None):
+        target = self._dir / prefix if prefix else self._dir
+        if not target.exists():
+            return []
+        names = []
+        for f in sorted(target.rglob("*.json")):
+            names.append(str(f.relative_to(self._dir)))
+        for f in sorted(target.rglob("*.jsonl")):
+            names.append(str(f.relative_to(self._dir)))
+        return sorted(names)
+
+    def read_blob(self, name):
+        return (self._dir / name).read_text()
+
+
+class TestFetchAndIngestMulti:
+    def test_parses_all_three_log_types(self, fetch_db, multi_format_dir):
+        from src.ingest.fetch import fetch_and_ingest_multi
+
+        source = _PrefixLocalFetcher(multi_format_dir)
+        stats = fetch_and_ingest_multi(
+            db=fetch_db,
+            source=source,
+            source_id_prefix="test",
+            prefixes=["cloudaudit.googleapis.com", "cloudscheduler.googleapis.com", "run.googleapis.com"],
+            service_worker_map={"worker": "worker-sa@proj.iam.gserviceaccount.com"},
+        )
+        assert stats["audit_parsed"] == 1
+        assert stats["scheduler_parsed"] == 1
+        assert stats["cloudrun_parsed"] == 1
+
+    def test_correlates_audit_events(self, fetch_db, multi_format_dir):
+        from src.ingest.fetch import fetch_and_ingest_multi
+
+        source = _PrefixLocalFetcher(multi_format_dir)
+        stats = fetch_and_ingest_multi(
+            db=fetch_db,
+            source=source,
+            source_id_prefix="test",
+            prefixes=["cloudaudit.googleapis.com", "cloudscheduler.googleapis.com", "run.googleapis.com"],
+            service_worker_map={"worker": "worker-sa@proj.iam.gserviceaccount.com"},
+        )
+        assert stats["correlated"] == 1
+        assert stats["inserted"] == 1
+
+    def test_inserts_correlated_event_with_trigger_ref(self, fetch_db, multi_format_dir):
+        from src.ingest.fetch import fetch_and_ingest_multi
+
+        source = _PrefixLocalFetcher(multi_format_dir)
+        fetch_and_ingest_multi(
+            db=fetch_db,
+            source=source,
+            source_id_prefix="test",
+            prefixes=["cloudaudit.googleapis.com", "cloudscheduler.googleapis.com", "run.googleapis.com"],
+            service_worker_map={"worker": "worker-sa@proj.iam.gserviceaccount.com"},
+        )
+        row = fetch_db.execute("SELECT trigger_ref, correlation_confidence FROM events").fetchone()
+        assert row is not None
+        assert row[0] is not None  # trigger_ref set
+        assert row[0].startswith("sched:")
+        assert row[1] > 0.0  # correlation_confidence set
+
+    def test_uses_per_prefix_checkpoints(self, fetch_db, multi_format_dir):
+        from src.ingest.fetch import fetch_and_ingest_multi, get_checkpoint
+
+        source = _PrefixLocalFetcher(multi_format_dir)
+        fetch_and_ingest_multi(
+            db=fetch_db,
+            source=source,
+            source_id_prefix="test",
+            prefixes=["cloudaudit.googleapis.com", "cloudscheduler.googleapis.com", "run.googleapis.com"],
+            service_worker_map={},
+        )
+        # Each prefix should have its own checkpoint
+        assert get_checkpoint(fetch_db, "test:cloudaudit.googleapis.com") is not None
+        assert get_checkpoint(fetch_db, "test:cloudscheduler.googleapis.com") is not None
+        assert get_checkpoint(fetch_db, "test:run.googleapis.com") is not None
+
+    def test_handles_json_array_format(self, fetch_db, tmp_path):
+        """GCS sink sometimes writes JSON arrays instead of NDJSON."""
+        from src.ingest.fetch import fetch_and_ingest_multi
+
+        audit_dir = tmp_path / "cloudaudit.googleapis.com"
+        audit_dir.mkdir()
+        # Write as JSON array (not NDJSON)
+        (audit_dir / "batch.json").write_text(json.dumps([_make_worker_audit_event()]))
+
+        source = _PrefixLocalFetcher(tmp_path)
+        stats = fetch_and_ingest_multi(
+            db=fetch_db,
+            source=source,
+            source_id_prefix="test",
+            prefixes=["cloudaudit.googleapis.com"],
+            service_worker_map={},
+        )
+        assert stats["audit_parsed"] == 1
+        assert stats["inserted"] == 1
+
+    def test_idempotent_rerun(self, fetch_db, multi_format_dir):
+        from src.ingest.fetch import fetch_and_ingest_multi
+
+        source = _PrefixLocalFetcher(multi_format_dir)
+        kwargs = dict(
+            db=fetch_db,
+            source=source,
+            source_id_prefix="test",
+            prefixes=["cloudaudit.googleapis.com", "cloudscheduler.googleapis.com", "run.googleapis.com"],
+            service_worker_map={"worker": "worker-sa@proj.iam.gserviceaccount.com"},
+        )
+        stats1 = fetch_and_ingest_multi(**kwargs)
+        stats2 = fetch_and_ingest_multi(**kwargs)
+        assert stats1["inserted"] == 1
+        assert stats2["blobs_processed"] == 0  # nothing new to process

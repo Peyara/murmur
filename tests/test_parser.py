@@ -171,6 +171,97 @@ class TestActionTypeMapping:
         assert event.action_type == ActionType.IAM_SET_POLICY
         assert event.target_zone == TargetZone.CONTROL
 
+    # ── New Sprint 1 ACTION_MAP entries (from real GCP data) ──
+
+    def test_iam_act_as(self):
+        raw = _make_raw_log(
+            "iam.googleapis.com",
+            "iam.serviceAccounts.actAs",
+            resource_name="projects/-/serviceAccounts/sa@proj.iam.gserviceaccount.com",
+        )
+        event = parse_audit_log(raw)
+        assert event.action_type == ActionType.IAM_IMPERSONATE
+        assert event.target_zone == TargetZone.IDENTITY
+
+    def test_secret_add_version(self):
+        raw = _make_raw_log(
+            "secretmanager.googleapis.com",
+            "google.cloud.secretmanager.v1.SecretManagerService.AddSecretVersion",
+            resource_name="projects/murmur-sandbox/secrets/my-secret",
+        )
+        event = parse_audit_log(raw)
+        assert event.action_type == ActionType.SECRET_ADMIN
+        assert event.target_zone == TargetZone.SECRET
+
+    def test_secret_create(self):
+        raw = _make_raw_log(
+            "secretmanager.googleapis.com",
+            "google.cloud.secretmanager.v1.SecretManagerService.CreateSecret",
+            resource_name="projects/murmur-sandbox/secrets/new-secret",
+        )
+        event = parse_audit_log(raw)
+        assert event.action_type == ActionType.SECRET_ADMIN
+        assert event.target_zone == TargetZone.SECRET
+
+    def test_gcs_list(self):
+        raw = _make_raw_log(
+            "storage.googleapis.com",
+            "storage.objects.list",
+            resource_name="projects/_/buckets/my-bucket",
+        )
+        event = parse_audit_log(raw)
+        assert event.action_type == ActionType.GCS_LIST
+        assert event.target_zone == TargetZone.DATA
+
+    def test_compute_create_instance(self):
+        raw = _make_raw_log(
+            "compute.googleapis.com",
+            "v1.compute.instances.insert",
+            resource_name="projects/murmur-sandbox/zones/us-central1-a/instances/vm-1",
+        )
+        event = parse_audit_log(raw)
+        assert event.action_type == ActionType.COMPUTE_CREATE
+        assert event.target_zone == TargetZone.COMPUTE
+
+    def test_cloud_run_create_service(self):
+        raw = _make_raw_log(
+            "run.googleapis.com",
+            "google.cloud.run.v1.Services.CreateService",
+            resource_name="namespaces/project/services/my-service",
+        )
+        event = parse_audit_log(raw)
+        assert event.action_type == ActionType.COMPUTE_CREATE
+        assert event.target_zone == TargetZone.COMPUTE
+
+    def test_cloud_run_set_iam_policy(self):
+        raw = _make_raw_log(
+            "run.googleapis.com",
+            "google.cloud.run.v1.Services.SetIamPolicy",
+            resource_name="projects/murmur-sandbox/locations/us-central1/services/my-service",
+        )
+        event = parse_audit_log(raw)
+        assert event.action_type == ActionType.IAM_SET_POLICY
+        assert event.target_zone == TargetZone.CONTROL
+
+    def test_scheduler_create_job(self):
+        raw = _make_raw_log(
+            "cloudscheduler.googleapis.com",
+            "google.cloud.scheduler.v1.CloudScheduler.CreateJob",
+            resource_name="projects/murmur-sandbox/locations/us-central1/jobs/my-job",
+        )
+        event = parse_audit_log(raw)
+        assert event.action_type == ActionType.SCHEDULER_ADMIN
+        assert event.target_zone == TargetZone.CONTROL
+
+    def test_gcs_list_exfil_risk_external_bucket(self):
+        raw = _make_raw_log(
+            "storage.googleapis.com",
+            "storage.objects.list",
+            resource_name="projects/_/buckets/external-export",
+        )
+        event = parse_audit_log(raw)
+        assert event.target_zone == TargetZone.EXFIL_RISK
+
     def test_unknown_service_maps_to_other(self):
         raw = _make_raw_log(
             "unknownservice.googleapis.com",
@@ -348,6 +439,41 @@ class TestEdgeCases:
         e1 = parse_audit_log(raw1)
         e2 = parse_audit_log(raw2)
         assert e1.event_id != e2.event_id
+
+
+# ── EXFIL_RISK zone override tests ─────────────────────────────────────
+
+
+# ── Infrastructure tagging tests ───────────────────────────────────────
+
+
+class TestInfrastructureTagging:
+    def test_logging_sa_tagged_as_infrastructure(self):
+        raw = _make_raw_log(
+            "storage.googleapis.com",
+            "storage.objects.create",
+            principal_email="service-1013530516622@gcp-sa-logging.iam.gserviceaccount.com",
+        )
+        event = parse_audit_log(raw)
+        assert event.is_infrastructure is True
+
+    def test_normal_sa_not_tagged_as_infrastructure(self):
+        raw = _make_raw_log(
+            "storage.googleapis.com",
+            "storage.objects.get",
+            principal_email="worker-sa@project.iam.gserviceaccount.com",
+        )
+        event = parse_audit_log(raw)
+        assert event.is_infrastructure is False
+
+    def test_human_not_tagged_as_infrastructure(self):
+        raw = _make_raw_log(
+            "iam.googleapis.com",
+            "SetIamPolicy",
+            principal_email="user@example.com",
+        )
+        event = parse_audit_log(raw)
+        assert event.is_infrastructure is False
 
 
 # ── EXFIL_RISK zone override tests ─────────────────────────────────────
