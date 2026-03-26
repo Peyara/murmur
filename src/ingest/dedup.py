@@ -33,9 +33,10 @@ def insert_event(db: duckdb.DuckDBPyConnection, event: CanonicalEvent) -> bool:
             provenance_level, provenance_source,
             action_type, action_subtype, tool_name, tool_parameters_hash, model_id,
             target_id, target_type, target_zone,
-            result, project_id, env, is_deploy, is_incident,
+            correlation_confidence,
+            result, project_id, env, is_deploy, is_incident, is_infrastructure,
             risk_tags, raw_ref, coverage_flag
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (event_id) DO NOTHING
         RETURNING event_id
         """,
@@ -58,11 +59,13 @@ def insert_event(db: duckdb.DuckDBPyConnection, event: CanonicalEvent) -> bool:
             event.target_id,
             str(event.target_type.value),
             str(event.target_zone.value),
+            event.correlation_confidence,
             str(event.result.value),
             event.project_id,
             event.env,
             event.is_deploy,
             event.is_incident,
+            event.is_infrastructure,
             event.risk_tags,
             event.raw_ref,
             event.coverage_flag,

@@ -144,8 +144,8 @@ class TestCanonicalEvent:
 
 
 class TestEnums:
-    def test_action_type_has_13_members(self):
-        assert len(ActionType) == 13
+    def test_action_type_has_17_members(self):
+        assert len(ActionType) == 17
 
     def test_target_zone_has_6_members(self):
         assert len(TargetZone) == 6

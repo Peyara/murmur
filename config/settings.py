@@ -23,7 +23,12 @@ class MurmurSettings:
 
     # --- Ingestion ---
     gcs_bucket: str = field(default_factory=lambda: os.environ.get("GCS_AUDIT_BUCKET", ""))
-    gcs_prefix: str = "cloudaudit.googleapis.com"
+    gcs_prefix: str = "cloudaudit.googleapis.com"  # legacy — kept for backward compat
+    gcs_prefixes: list[str] = field(default_factory=lambda: [
+        "cloudaudit.googleapis.com",
+        "cloudscheduler.googleapis.com",
+        "run.googleapis.com",
+    ])
 
     # --- Windowing ---
     window_size_minutes: int = 15
@@ -54,6 +59,12 @@ class MurmurSettings:
     pattern_weight_zone: float = 0.35
     pattern_weight_time: float = 0.20
     pattern_weight_rate: float = 0.15
+
+    # --- Correlation (Sprint 1) ---
+    # Maps Cloud Run service_name → expected worker SA email
+    service_worker_map: dict[str, str] = field(default_factory=lambda: {
+        # Populated from env or config once real services are deployed
+    })
 
     # --- Trigger chain ---
     trigger_chain_max_depth: int = 10

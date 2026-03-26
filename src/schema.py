@@ -17,11 +17,15 @@ class ActionType(StrEnum):
     IAM_DELETE_KEY = "IAM_DELETE_KEY"
     IAM_IMPERSONATE = "IAM_IMPERSONATE"
     SECRET_ACCESS = "SECRET_ACCESS"  # nosec B105 — enum value, not a password
+    SECRET_ADMIN = "SECRET_ADMIN"  # nosec B105 — CreateSecret, AddSecretVersion
     KMS_DECRYPT = "KMS_DECRYPT"
     GCS_READ = "GCS_READ"
     GCS_WRITE = "GCS_WRITE"
+    GCS_LIST = "GCS_LIST"
     BQ_JOB_SUBMIT = "BQ_JOB_SUBMIT"
+    COMPUTE_CREATE = "COMPUTE_CREATE"
     COMPUTE_METADATA_CHANGE = "COMPUTE_METADATA_CHANGE"
+    SCHEDULER_ADMIN = "SCHEDULER_ADMIN"
     AGENT_TOOL_CALL = "AGENT_TOOL_CALL"
     OTHER = "OTHER"
 
@@ -114,11 +118,15 @@ class CanonicalEvent:
     tool_parameters_hash: str | None = None
     model_id: str | None = None
 
+    # --- Correlation ---
+    correlation_confidence: float = 0.0  # 0.0-1.0 composite confidence for derived trigger_ref
+
     # --- Context ---
     project_id: str | None = None
     env: str = "sandbox"
     is_deploy: bool = False
     is_incident: bool = False
+    is_infrastructure: bool = False  # True for infra meta-logs (e.g. logging SA)
     risk_tags: str = "[]"  # JSON array of string tags
     raw_ref: str | None = None
     coverage_flag: bool = True

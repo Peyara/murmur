@@ -26,18 +26,35 @@ logger = logging.getLogger(__name__)
 # (serviceName, methodName substring) -> (ActionType, TargetZone)
 # Order matters: more specific patterns checked first via substring match.
 ACTION_MAP: list[tuple[str, str, ActionType, TargetZone]] = [
+    # IAM — more specific patterns first
     ("iam.googleapis.com", "CreateServiceAccountKey", ActionType.IAM_CREATE_KEY, TargetZone.IDENTITY),
     ("iam.googleapis.com", "DeleteServiceAccountKey", ActionType.IAM_DELETE_KEY, TargetZone.IDENTITY),
     ("iam.googleapis.com", "CreateServiceAccount", ActionType.IAM_CREATE_SA, TargetZone.IDENTITY),
+    ("iam.googleapis.com", "serviceAccounts.actAs", ActionType.IAM_IMPERSONATE, TargetZone.IDENTITY),
     ("iam.googleapis.com", "SetIamPolicy", ActionType.IAM_SET_POLICY, TargetZone.CONTROL),
     ("iamcredentials.googleapis.com", "GenerateAccessToken", ActionType.IAM_IMPERSONATE, TargetZone.IDENTITY),
     ("iamcredentials.googleapis.com", "GenerateIdToken", ActionType.IAM_IMPERSONATE, TargetZone.IDENTITY),
+    # Secret Manager — admin before access (more specific first)
+    ("secretmanager.googleapis.com", "AddSecretVersion", ActionType.SECRET_ADMIN, TargetZone.SECRET),
+    ("secretmanager.googleapis.com", "CreateSecret", ActionType.SECRET_ADMIN, TargetZone.SECRET),
     ("secretmanager.googleapis.com", "AccessSecretVersion", ActionType.SECRET_ACCESS, TargetZone.SECRET),
+    # KMS
     ("cloudkms.googleapis.com", "Decrypt", ActionType.KMS_DECRYPT, TargetZone.SECRET),
+    # Storage — list before get (more specific first)
+    ("storage.googleapis.com", "storage.objects.list", ActionType.GCS_LIST, TargetZone.DATA),
     ("storage.googleapis.com", "storage.objects.get", ActionType.GCS_READ, TargetZone.DATA),
     ("storage.googleapis.com", "storage.objects.create", ActionType.GCS_WRITE, TargetZone.DATA),
+    # BigQuery
     ("bigquery.googleapis.com", "jobservice.insert", ActionType.BQ_JOB_SUBMIT, TargetZone.DATA),
+    # Compute — create before metadata (more specific first)
+    ("compute.googleapis.com", "instances.insert", ActionType.COMPUTE_CREATE, TargetZone.COMPUTE),
     ("compute.googleapis.com", "setMetadata", ActionType.COMPUTE_METADATA_CHANGE, TargetZone.COMPUTE),
+    # Cloud Run — SetIamPolicy before CreateService
+    ("run.googleapis.com", "SetIamPolicy", ActionType.IAM_SET_POLICY, TargetZone.CONTROL),
+    ("run.googleapis.com", "CreateService", ActionType.COMPUTE_CREATE, TargetZone.COMPUTE),
+    # Cloud Scheduler
+    ("cloudscheduler.googleapis.com", "CreateJob", ActionType.SCHEDULER_ADMIN, TargetZone.CONTROL),
+    # Resource Manager
     ("cloudresourcemanager.googleapis.com", "SetIamPolicy", ActionType.IAM_SET_POLICY, TargetZone.CONTROL),
 ]
 
@@ -63,12 +80,23 @@ def _resolve_action(service_name: str, method_name: str) -> tuple[ActionType, Ta
     return ActionType.OTHER, TargetZone.DATA
 
 
+# GCP infrastructure service account suffixes — these generate meta-logs
+_INFRASTRUCTURE_SA_SUFFIXES = (
+    "@gcp-sa-logging.iam.gserviceaccount.com",
+)
+
+
 def _resolve_actor_type(principal_email: str) -> ActorType:
     if principal_email.endswith(".gserviceaccount.com"):
         return ActorType.SERVICE_ACCOUNT
     if principal_email == "unknown":
         return ActorType.UNKNOWN
     return ActorType.HUMAN
+
+
+def _is_infrastructure_actor(actor_id: str) -> bool:
+    """Check if actor is a GCP infrastructure service account."""
+    return any(actor_id.endswith(suffix) for suffix in _INFRASTRUCTURE_SA_SUFFIXES)
 
 
 def _resolve_target_type(resource_name: str) -> TargetType:
@@ -80,7 +108,7 @@ def _resolve_target_type(resource_name: str) -> TargetType:
 
 def _is_exfil_risk(resource_name: str, action_type: ActionType) -> bool:
     """Check if a DATA-zone resource should be reclassified as EXFIL_RISK."""
-    if action_type not in (ActionType.GCS_READ, ActionType.GCS_WRITE, ActionType.BQ_JOB_SUBMIT):
+    if action_type not in (ActionType.GCS_READ, ActionType.GCS_WRITE, ActionType.GCS_LIST, ActionType.BQ_JOB_SUBMIT):
         return False
     for pattern in SETTINGS.exfil_risk_patterns:
         if pattern in resource_name:
@@ -93,7 +121,7 @@ def _is_exfil_risk(resource_name: str, action_type: ActionType) -> bool:
     return False
 
 
-def _parse_timestamp(ts_str: str) -> datetime:
+def parse_timestamp(ts_str: str) -> datetime:
     """Parse GCP timestamp (ISO 8601 with Z suffix)."""
     ts_str = ts_str.rstrip("Z")
     # Handle variable fractional seconds
@@ -143,7 +171,7 @@ def parse_audit_log(raw: dict) -> CanonicalEvent:
 
     # Timestamp (required)
     ts_str = raw["timestamp"]
-    ts = _parse_timestamp(ts_str)
+    ts = parse_timestamp(ts_str)
     window_start = _floor_to_window(ts)
 
     # Insert ID
@@ -185,5 +213,6 @@ def parse_audit_log(raw: dict) -> CanonicalEvent:
         trigger_ref=trigger_ref,
         provenance_level=provenance_level,
         provenance_source=provenance_source,
+        is_infrastructure=_is_infrastructure_actor(actor_id),
         raw_ref=f"{log_name}:{insert_id}" if log_name else insert_id,
     )

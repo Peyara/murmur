@@ -137,6 +137,40 @@ Before creating any new module, class, or interface: search the codebase for an 
 
 ---
 
+## Hydration / Onboarding — Self-Learning Architecture
+
+Murmur is a **self-learning system**. The murmurs of today power the Murmur of tomorrow. It requires a **hydration period** when onboarding to a new platform — this is by design, not a limitation.
+
+The system must observe a platform's actors, services, temporal cadences, and causal patterns before it can correlate and score with confidence. Skipping observation produces false positives. The hydration period is the cost of accuracy at steady state.
+
+**During hydration, Murmur:**
+- Ingests and parses all log streams (multi-format)
+- Discovers service-to-identity mappings via `validate_service_worker_map()`
+- Estimates job cadences from scheduler execution history
+- Builds baseline zone flux and actor patterns
+- Runs in observation mode — no alerts, no scoring, only learning
+
+**Hydration is complete when:**
+- All configured services have confirming observations (identity mapping validated)
+- Cadence estimated for all recurring jobs
+- >= 1 full cycle of each temporal pattern observed
+
+**Minimum hydration:** ~3x the longest job cadence (15 min for 5-min jobs, 3h for hourly, 3 days for daily).
+
+**Onboarding timeline (investor pitch):**
+| Phase | Duration | Output |
+|-------|----------|--------|
+| Deploy | ~1 hour | Logs flowing |
+| Hydrate | 3x longest cadence | Identity mappings, cadence estimates |
+| Baseline | 24-48h | Zone flux baseline, scoring calibration |
+| Operational | Ongoing | Alerts, provenance, risk scores |
+
+Typical GCP environment (5-min scheduled + hourly maintenance): **operational in ~25h.**
+
+This is the "observe before hypothesize" principle at the system level. It's also what makes Murmur self-maintaining — it continuously validates its own assumptions against new observations, flagging drift without human intervention.
+
+---
+
 ## Implementation Communication Protocol
 
 At each **sprint milestone** (logical unit of work completed, e.g., "parser done", "invariants implemented", "attack generator producing trajectories"):

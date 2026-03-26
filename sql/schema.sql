@@ -24,11 +24,13 @@ CREATE TABLE IF NOT EXISTS events (
     target_id           VARCHAR NOT NULL,
     target_type         VARCHAR NOT NULL,
     target_zone         VARCHAR NOT NULL,      -- CONTROL | IDENTITY | SECRET | DATA | COMPUTE | EXFIL_RISK
+    correlation_confidence FLOAT DEFAULT 0.0,    -- 0.0-1.0 composite confidence for derived trigger_ref
     result              VARCHAR NOT NULL DEFAULT 'SUCCESS',
     project_id          VARCHAR,
     env                 VARCHAR DEFAULT 'sandbox',
     is_deploy           BOOLEAN DEFAULT FALSE,
     is_incident         BOOLEAN DEFAULT FALSE,
+    is_infrastructure   BOOLEAN DEFAULT FALSE,  -- True for infra meta-logs (e.g. logging SA)
     risk_tags           VARCHAR DEFAULT '[]',   -- JSON array
     raw_ref             VARCHAR,
     coverage_flag       BOOLEAN DEFAULT TRUE
