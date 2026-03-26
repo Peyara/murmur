@@ -373,7 +373,10 @@ def _make_scheduler_entry(scheduled_time: str = "2026-03-25T10:00:00Z") -> dict:
         },
         "logName": "projects/p/logs/cloudscheduler.googleapis.com%2Fexecutions",
         "receiveTimestamp": "2026-03-25T10:00:02Z",
-        "resource": {"labels": {"job_id": "trigger-worker", "location": "us-central1", "project_id": "p"}, "type": "cloud_scheduler_job"},
+        "resource": {
+            "labels": {"job_id": "trigger-worker", "location": "us-central1", "project_id": "p"},
+            "type": "cloud_scheduler_job",
+        },
         "severity": "INFO",
         "timestamp": "2026-03-25T10:00:02Z",
     }

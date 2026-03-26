@@ -2,19 +2,14 @@
 
 from datetime import datetime, timedelta
 
-import pytest
-
+from src.ingest.cloudrun_parser import CloudRunRequest
 from src.ingest.correlate import (
-    correlate_events,
-    CorrelationResult,
-    HydrationReport,
     ServiceWorkerMap,
+    correlate_events,
     validate_service_worker_map,
 )
 from src.ingest.scheduler_parser import SchedulerExecution
-from src.ingest.cloudrun_parser import CloudRunRequest
 from tests.conftest import make_event
-
 
 # ── Helpers ──
 
@@ -68,7 +63,7 @@ def _audit_event(
     actor_id: str = WORKER_SA,
     ts: datetime = BASE_TIME + timedelta(seconds=5),
     event_id: str = "evt-001",
-) -> "CanonicalEvent":
+):
     return make_event(
         event_id=event_id,
         actor_id=actor_id,

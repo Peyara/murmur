@@ -1,10 +1,9 @@
 """Tests for multi-format log dispatcher."""
 
-import pytest
 
-from src.ingest.multi_parser import dispatch_parse, ParseResult
-from src.ingest.scheduler_parser import SchedulerExecution
 from src.ingest.cloudrun_parser import CloudRunRequest
+from src.ingest.multi_parser import dispatch_parse
+from src.ingest.scheduler_parser import SchedulerExecution
 from src.schema import CanonicalEvent
 
 
@@ -36,7 +35,10 @@ def _make_scheduler_log() -> dict:
         },
         "logName": "projects/p/logs/cloudscheduler.googleapis.com%2Fexecutions",
         "receiveTimestamp": "2026-03-25T10:00:01Z",
-        "resource": {"labels": {"job_id": "j", "location": "us-central1", "project_id": "p"}, "type": "cloud_scheduler_job"},
+        "resource": {
+            "labels": {"job_id": "j", "location": "us-central1", "project_id": "p"},
+            "type": "cloud_scheduler_job",
+        },
         "severity": "INFO",
         "timestamp": "2026-03-25T10:00:01Z",
     }

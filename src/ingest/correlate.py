@@ -14,7 +14,7 @@ Correlation confidence is a composite of:
 
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from src.ingest.cloudrun_parser import CloudRunRequest
 from src.ingest.scheduler_parser import SchedulerExecution

@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from src.ingest.cloudrun_parser import CloudRunRequest, parse_cloudrun_log, can_parse_cloudrun
+from src.ingest.cloudrun_parser import can_parse_cloudrun, parse_cloudrun_log
 
 
 def _make_cloudrun_request(

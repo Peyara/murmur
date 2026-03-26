@@ -4,8 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from src.ingest.scheduler_parser import SchedulerExecution, parse_scheduler_log, can_parse_scheduler
-
+from src.ingest.scheduler_parser import can_parse_scheduler, parse_scheduler_log
 
 # ── Real data samples (from data/raw_inspection/scheduler_executions.json) ──
 
