@@ -19,10 +19,14 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 | Decision | Alternatives considered | Why rejected |
 |---|---|---|
+| Expand GCS sink (not API fetcher) | Cloud Logging API fetcher | API adds runtime dep, pagination, rate limits. Sink reuses existing pipeline. |
 | Scheduler/Cloud Run logs as correlation metadata, not CanonicalEvents | Parse into CanonicalEvents with new zone types | No natural actor-target-zone mapping; forces invented ActionTypes |
+| Per-format wrapper parsers with common interface | Single integrated parser; registry dispatcher | 3 structurally different formats. Wrapper is independently testable. |
 | Correlation confidence as composite (identity 0.4, URL 0.3, ambiguity 0.2, temporal 0.1) | Temporal-only; binary match/no-match | Temporal proximity is weakest signal — structural matches are deterministic, timing is noisy |
 | Tag infrastructure, don't filter | Filter at ingestion; ignore | Filtering is lossy — need data for learning and auditing |
 | Hydration period as design feature, not limitation | Skip observation, deploy with static rules | Static rules produce false positives. Self-learning requires observation period. |
+| URL-match priority over temporal proximity in linker | Closest-in-time regardless of URL | PR review finding: contradicted own confidence model weights. |
+| Bundle Session A in one PR | Split into multiple PRs | One-off — cohesive foundation, all changes tightly coupled. |
 
 **Findings**
 
@@ -31,11 +35,23 @@ For current state / resume point, see `CURRENT_STATE.md`.
 | Cold start is narrow: only identity mapping (service→SA) needs config or learning | Correlator hop 1 (sched→cloudrun) is fully deterministic from first event | Built validate_service_worker_map() to verify config against observations |
 | Hydration period is a first-class design concept | Investor-facing: time-to-value = deploy(1h) + hydrate(3x cadence) + baseline(24h) | Documented in CLAUDE.md and mvp_strategy.md |
 | Murmur is self-learning: murmurs of today power Murmur of tomorrow | Architecture principle, not just implementation detail | Framed as continuous self-validation, not one-time configuration |
+| PR review caught linker contradicting confidence model | URL-match was tie-breaker, should have been primary | Fixed before merge. Pattern: review catches design-intent drift. |
+
+**CLAUDE.md Exceptions**
+- "One feature per session" — bundled foundation. One-off.
+- "Tests before code" — hydration tests written alongside, not strictly before. One-off (concept emerged from discussion).
 
 **Open Questions**
 1. Auto-discovery of service_worker_map (Sprint 2-3) — how many observation cycles needed for confident auto-mapping?
-2. Self-learning parser (Sprint 2-3) — config-driven parser from inspector+agent pipeline
+2. Self-learning parser (Sprint 2-3) — config-driven parser from inspector+agent pipeline. Issue to be created.
 3. Correlation confidence weights need calibration against real latency distributions (Session C)
+4. Schema migration for existing DuckDB files — track for pre-production (Sprint 3)
+5. EXFIL_RISK pattern tuning — still pending from issue #2
+6. known_initiators.json needs real scheduler SA from deployed environment
+
+**CLAUDE.md Evolution Candidates**
+- "Review warnings fixed in-PR before merge" — **watch**
+- "PR notes lead with goal/outcome narrative" — **watch** (validated in pr-notes skill)
 
 ---
 
