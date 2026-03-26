@@ -101,3 +101,45 @@ class TestEnrichProvenanceBatch:
         assert results[0].provenance_source == ProvenanceSource.CLOUD_SCHEDULER
         assert results[1].provenance_level == ProvenanceLevel.NONE
         assert results[1].provenance_source == ProvenanceSource.UNKNOWN
+
+
+class TestLoadKnownInitiators:
+    def test_resolves_project_number_placeholder(self, tmp_path, monkeypatch):
+        """PROJECT_NUMBER placeholder in known_initiators.json is resolved from env."""
+        config_file = tmp_path / "known_initiators.json"
+        config_file.write_text(
+            '["service-PROJECT_NUMBER@gcp-sa-cloudscheduler.iam.gserviceaccount.com"]'
+        )
+        monkeypatch.setenv("GCP_PROJECT_NUMBER", "9876543210")
+
+        from config.settings import MurmurSettings
+
+        settings = MurmurSettings(known_initiators_path=str(config_file))
+        result = settings.load_known_initiators()
+        assert "service-9876543210@gcp-sa-cloudscheduler.iam.gserviceaccount.com" in result
+
+    def test_placeholder_unresolved_when_env_missing(self, tmp_path, monkeypatch):
+        """Without GCP_PROJECT_NUMBER env var, placeholder stays as-is."""
+        config_file = tmp_path / "known_initiators.json"
+        config_file.write_text(
+            '["service-PROJECT_NUMBER@gcp-sa-cloudscheduler.iam.gserviceaccount.com"]'
+        )
+        monkeypatch.delenv("GCP_PROJECT_NUMBER", raising=False)
+
+        from config.settings import MurmurSettings
+
+        settings = MurmurSettings(known_initiators_path=str(config_file))
+        result = settings.load_known_initiators()
+        assert "service-PROJECT_NUMBER@gcp-sa-cloudscheduler.iam.gserviceaccount.com" in result
+
+    def test_non_placeholder_entries_unchanged(self, tmp_path, monkeypatch):
+        """Entries without PROJECT_NUMBER are returned as-is."""
+        config_file = tmp_path / "known_initiators.json"
+        config_file.write_text('["service-123456@gcp-sa-cloudscheduler.iam.gserviceaccount.com"]')
+        monkeypatch.setenv("GCP_PROJECT_NUMBER", "9876543210")
+
+        from config.settings import MurmurSettings
+
+        settings = MurmurSettings(known_initiators_path=str(config_file))
+        result = settings.load_known_initiators()
+        assert "service-123456@gcp-sa-cloudscheduler.iam.gserviceaccount.com" in result
