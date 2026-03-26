@@ -63,7 +63,7 @@ class MurmurSettings:
     # --- Correlation (Sprint 1) ---
     # Maps Cloud Run service_name → expected worker SA email
     service_worker_map: dict[str, str] = field(default_factory=lambda: {
-        "normal-worker": "normal-worker-sa@project-1f4f13c5-912e-45ae-b8a.iam.gserviceaccount.com",
+        "normal-worker": f"normal-worker-sa@{os.environ.get('GCP_PROJECT_ID', '')}.iam.gserviceaccount.com",
     })
 
     # --- Trigger chain ---
@@ -78,11 +78,21 @@ class MurmurSettings:
     })
 
     def load_known_initiators(self) -> set[str]:
+        """Load known initiator SA emails. Resolves PROJECT_NUMBER placeholder from env."""
         path = Path(self.known_initiators_path)
-        if path.exists():
-            with open(path) as f:
-                return set(json.load(f))
-        return set()
+        if not path.exists():
+            return set()
+        with open(path) as f:
+            raw = set(json.load(f))
+        # Resolve PROJECT_NUMBER placeholder from GCP_PROJECT_NUMBER env var
+        project_number = os.environ.get("GCP_PROJECT_NUMBER", "")
+        resolved = set()
+        for sa in raw:
+            if "PROJECT_NUMBER" in sa and project_number:
+                resolved.add(sa.replace("PROJECT_NUMBER", project_number))
+            else:
+                resolved.add(sa)
+        return resolved
 
 
 # Singleton instance — import this

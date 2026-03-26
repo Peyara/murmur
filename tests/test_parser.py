@@ -452,7 +452,7 @@ class TestInfrastructureTagging:
         raw = _make_raw_log(
             "storage.googleapis.com",
             "storage.objects.create",
-            principal_email="service-1013530516622@gcp-sa-logging.iam.gserviceaccount.com",
+            principal_email="service-123456789@gcp-sa-logging.iam.gserviceaccount.com",
         )
         event = parse_audit_log(raw)
         assert event.is_infrastructure is True

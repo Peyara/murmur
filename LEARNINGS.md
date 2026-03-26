@@ -382,7 +382,7 @@ Six specific findings abstracted into reusable principles:
 
 **Session Summary**
 - Mode: Production
-- Planned GCP sandbox provisioning for Sprint 0B-2. Drafted 10-step infrastructure plan: project creation, API enabling, GCS bucket, audit log sink, Data Access logs, secrets, Cloud Run, Cloud Scheduler, billing alert, e2-micro VM. Plan approved. User created GCP account (samreen654@gmail.com), billing, and murmur-sandbox project in console. No infrastructure commands executed — blocked on gcloud CLI auth (currently authenticated as shamreen.iram@lightbird.ai, not samreen654@gmail.com).
+- Planned GCP sandbox provisioning for Sprint 0B-2. Drafted 10-step infrastructure plan: project creation, API enabling, GCS bucket, audit log sink, Data Access logs, secrets, Cloud Run, Cloud Scheduler, billing alert, e2-micro VM. Plan approved. User created GCP account (<operator-email>), billing, and murmur-sandbox project in console. No infrastructure commands executed — blocked on gcloud CLI auth (currently authenticated as <operator-corp-email>, not <operator-email>).
 - Status: Blocked. Resume by authenticating gcloud, then execute plan steps 1-10.
 
 **Decisions**
@@ -406,7 +406,7 @@ Six specific findings abstracted into reusable principles:
 4. Sandbox activity diversity — may need manual activity generation (carried forward).
 5. EXFIL_RISK zone patterns — tune with real GCP data (carried forward).
 6. 2 remaining items on issue #2: EXFIL_RISK tuning (Sprint 0B), index planning (Sprint 1) (carried forward).
-7. gcloud auth — need to authenticate as samreen654@gmail.com before running any provisioning commands.
+7. gcloud auth — need to authenticate as <operator-email> before running any provisioning commands.
 
 **CLAUDE.md Evolution Candidates**
 1. "Interactive infra provisioning as guided walkthrough" — separate browser steps from CLI steps in plans. **watch**

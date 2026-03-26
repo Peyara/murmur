@@ -1,4 +1,4 @@
 [
-  "service-1013530516622@gcp-sa-cloudscheduler.iam.gserviceaccount.com",
+  "service-PROJECT_NUMBER@gcp-sa-cloudscheduler.iam.gserviceaccount.com",
   "service-123456@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
 ]

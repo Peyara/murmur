@@ -29,7 +29,7 @@ The correlator uses composite confidence scoring:
   - Reads `secret_high` from Secret Manager (→ SECRET_ACCESS / SECRET zone)
   - Lists + reads file from `murmur-input-sandbox` (→ GCS_LIST + GCS_READ / DATA zone)
   - Writes processed result to `murmur-output-sandbox` (→ GCS_WRITE / DATA zone)
-- **Actor:** `normal-worker-sa@project-1f4f13c5-912e-45ae-b8a.iam.gserviceaccount.com`
+- **Actor:** `normal-worker-sa@<project-id>.iam.gserviceaccount.com`
 - **Scheduler:** `trigger-normal-worker` (*/5 * * * *, OIDC auth via `scheduler-sa`)
 - **Additional noise:** Cloud Build deploy events (~40 Docker-* audit entries), human ad-hoc commands, infrastructure logging SA
 
@@ -79,14 +79,14 @@ Confidence breakdown for event 5 (perfect score = 1.0):
 
 149 audit events correctly NOT correlated:
 - Infrastructure SA (logging writes): no match in service_worker_map → confidence 0.0
-- Human activity (samreen654): no match in service_worker_map → confidence 0.0
+- Human activity (<operator>): no match in service_worker_map → confidence 0.0
 - Cloud Build SA (Docker operations): no match in service_worker_map → confidence 0.0
 
 ### 3.4 Hydration Status
 
 `validate_service_worker_map()` reported: `hydration_complete=False`, mismatch detected.
 
-**Explanation:** In the 19:00 hour, human activity (deploy + manual commands) produced 37 events in scheduler→cloudrun correlation windows, outnumbering the 8 worker events. The validator picked `samreen654@gmail.com` as the most frequent SA — correct behavior given the data, but a false mismatch caused by deploy noise.
+**Explanation:** In the 19:00 hour, human activity (deploy + manual commands) produced 37 events in scheduler→cloudrun correlation windows, outnumbering the 8 worker events. The validator picked `<operator-email>` as the most frequent SA — correct behavior given the data, but a false mismatch caused by deploy noise.
 
 **Expected resolution:** After ~2 hours of uninterrupted 5-min worker invocations (~24 events/hour × 4 per invocation = 96 worker events vs diminishing human activity), the worker SA will dominate and hydration will confirm.
 
@@ -100,7 +100,7 @@ Things we noticed in the real data that we didn't predict:
 
 1. **Cloud Build generates rich audit trail.** A single `--source` deploy produced ~40 Docker-* events from the default compute SA. These are `Docker-GetManifest`, `Docker-StartUpload`, `Docker-FinishUpload`, `Docker-HeadBlob`, `Docker-PutManifest`, `Docker-ServeBlob`. None of these are in our ACTION_MAP — they all map to OTHER/DATA. This is a real-world signal class we hadn't considered.
 
-2. **A new SA appeared: `serverless-robot-prod`.** The `service-1013530516622@serverless-robot-prod.iam.gserviceaccount.com` SA performed Docker operations during the Cloud Run deployment. This is GCP's internal service agent for Cloud Run container image pulling. It's infrastructure, not attacker or operator.
+2. **A new SA appeared: `serverless-robot-prod`.** The `service-<project-number>@serverless-robot-prod.iam.gserviceaccount.com` SA performed Docker operations during the Cloud Run deployment. This is GCP's internal service agent for Cloud Run container image pulling. It's infrastructure, not attacker or operator.
 
 3. **`storage.buckets.getStorageLayout` appears in human gcloud commands.** This is a read-only metadata operation that's not in our ACTION_MAP. Maps to OTHER/DATA currently.
 
@@ -134,4 +134,4 @@ Things we noticed in the real data that we didn't predict:
 
 ---
 
-*Evidence collected from real GCP audit logs in project `project-1f4f13c5-912e-45ae-b8a`. No synthetic data used. All findings derived from observation, not pre-labeled expectations.*
+*Evidence collected from real GCP audit logs in project `<project-id>`. No synthetic data used. All findings derived from observation, not pre-labeled expectations.*

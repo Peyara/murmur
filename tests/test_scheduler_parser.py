@@ -12,10 +12,10 @@ from src.ingest.scheduler_parser import can_parse_scheduler, parse_scheduler_log
 def _make_attempt_started(
     job_name: str = "projects/proj/locations/us-central1/jobs/trigger-normal-worker",
     scheduled_time: str = "2026-03-25T19:00:53.95875Z",
-    url: str = "https://normal-worker-1013530516622.us-central1.run.app/",
+    url: str = "https://normal-worker-123456789.us-central1.run.app/",
     timestamp: str = "2026-03-25T19:01:02.017128147Z",
     insert_id: str = "1qhiz4xf2nt1ny",
-    project_id: str = "project-1f4f13c5-912e-45ae-b8a",
+    project_id: str = "test-project",
 ) -> dict:
     return {
         "insertId": insert_id,
@@ -43,7 +43,7 @@ def _make_attempt_started(
 
 def _make_attempt_finished(
     job_name: str = "projects/proj/locations/us-central1/jobs/trigger-normal-worker",
-    url: str = "https://normal-worker-1013530516622.us-central1.run.app/",
+    url: str = "https://normal-worker-123456789.us-central1.run.app/",
     timestamp: str = "2026-03-25T19:01:02.109150691Z",
     insert_id: str = "1e014qbf70zu2t",
     status_code: int = 200,
@@ -119,7 +119,7 @@ class TestParseAttemptStarted:
 
     def test_extracts_target_url(self):
         result = parse_scheduler_log(_make_attempt_started())
-        assert result.target_url == "https://normal-worker-1013530516622.us-central1.run.app/"
+        assert result.target_url == "https://normal-worker-123456789.us-central1.run.app/"
 
     def test_attempt_type_is_started(self):
         result = parse_scheduler_log(_make_attempt_started())
@@ -135,7 +135,7 @@ class TestParseAttemptStarted:
 
     def test_extracts_project_id(self):
         result = parse_scheduler_log(_make_attempt_started())
-        assert result.project_id == "project-1f4f13c5-912e-45ae-b8a"
+        assert result.project_id == "test-project"
 
     def test_status_is_none_for_started(self):
         result = parse_scheduler_log(_make_attempt_started())
