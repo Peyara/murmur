@@ -40,7 +40,6 @@ Deploy a realistic mini-production workload that gives Murmur diverse, cross-zon
 - [ ] Second Cloud Scheduler job -> maintenance script (on e2-micro or second Cloud Run)
 - [ ] Rotates secrets (`AddSecretVersion`), creates/deletes SA keys, updates IAM, verifies rotation
 - [ ] Produces: CONTROL -> IDENTITY -> SECRET transitions hourly
-- [ ] Tests invariant false positive suppression: INV_001, INV_002, INV_006 fire on sanctioned maintenance — pattern match must suppress them
 
 **Workflow 3 — Cleanup (daily):**
 - [ ] Daily cron: list/delete old GCS objects, write summary report
@@ -53,7 +52,22 @@ Deploy a realistic mini-production workload that gives Murmur diverse, cross-zon
 - [ ] Second Cloud Scheduler job (hourly trigger for maintenance)
 - [ ] Third Cloud Scheduler job or cron (daily trigger for cleanup)
 
-**Expected output after 24h:** 5-6 non-zero zone pairs in the flux matrix. 3 temporal cadences (5-min, hourly, daily). 3 distinct SAs. Invariant-relevant events (key creation, IAM changes, secret access by novel actor) — all sanctioned. This baseline makes injected attacks (S01) visibly anomalous.
+**Workflow 4 — Unstructured human activity (ad-hoc, manual):**
+- [ ] Manually run `gcloud` commands at irregular intervals during the sprint:
+  - Access secrets via CLI (not scheduled — no trigger_ref)
+  - List and inspect resources (`gcloud compute instances list`, `gcloud iam service-accounts list`)
+  - SSH to the VM (`gcloud compute ssh`)
+  - Make one-off IAM changes (grant/revoke a test permission)
+- [ ] These produce events that don't follow patterns, don't have trigger_ref, but ARE legitimate
+- [ ] Purpose: test that the system handles unstructured sanctioned activity without false-alerting
+
+**Observation-first validation (critical):**
+- [ ] After 24h of activity, run the inspector BEFORE writing detection code
+- [ ] Produce an inspector report: what zones are active, what temporal patterns exist, what actors appear, what our invariants would flag, and — critically — what they would MISS
+- [ ] Do NOT pre-label expected outcomes. Let the data speak first.
+- [ ] Keep infrastructure meta-logs (logging SA) in the dataset — they're real noise the system must handle
+
+**Expected output after 24h:** Cross-zone activity across 5-6 zone pairs. Multiple temporal cadences. 3+ SAs + human activity. A landscape rich enough to evaluate our model against — including signals we didn't anticipate.
 
 ### Ingestion Foundation (~2 days)
 
@@ -182,12 +196,23 @@ These deliverables unblock the provenance layer. Build before world model.
 
 ### Validation Criteria (ALL must be met to proceed)
 
+**Pipeline health:**
 - [ ] Parse rate >90% on each log type (audit, scheduler, Cloud Run)
+- [ ] Action type coverage >80% (events mapped to specific types, not OTHER)
 - [ ] Correlation accuracy >80% (scheduler executions linked to Cloud Run invocations)
+
+**Signal validation:**
 - [ ] sigma_coarse shows measurable variance between active and quiet windows
 - [ ] Registered sanctioned pattern produces pattern_match_score >0.7 for normal-worker
 - [ ] Injected attack produces residual_risk >= 2x normal window average
 - [ ] Zero invariant false positives on baseline scheduled activity
+
+**Bias check (observation-first):**
+- [ ] Inspector report produced on 48h of real activity BEFORE evaluating results
+- [ ] Catalog ALL invariant firings — explain each one (expected or unexpected)
+- [ ] Name at least 2 patterns in the real data that no invariant checks — blind spots documented
+- [ ] Name at least 1 type of legitimate activity that the model handles poorly (false positive or confusing score)
+- [ ] Human ad-hoc activity (no trigger_ref, no pattern) does not produce false alerts
 
 ### If Validation Fails
 
