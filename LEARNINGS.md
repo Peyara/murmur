@@ -73,6 +73,7 @@ Six specific findings abstracted into reusable principles:
 5. "PR notes lead with goal/outcome" — **done** (pr-notes skill).
 6. "RD reports as lab notebooks" — **watch**.
 7. "Custom agents for dev-time reasoning" — **watch**.
+8. "Objectivity over agreement" — **done** (peyara-standards, collaboration section). Challenge own proposals, stress-test convergence, no echo chambers.
 
 ---
 

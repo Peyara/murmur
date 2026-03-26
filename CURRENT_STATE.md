@@ -27,7 +27,7 @@ Cloud Scheduler firing every 5 min (hello-world container — to be replaced in 
 - **Sprint 1 spec:** `docs/sprints/sprint_01_core_detection.md` (includes Day 0 activity generator, ingestion foundation, observation-first validation)
 - **R&D report:** `docs/rd_reports/2026-03-25_trigger_ref_discovery.md` (trigger_ref evidence, architecture implications)
 - **MVP strategy:** `docs/mvp_strategy.md` (updated data flow, causal chain, critical decisions)
-- **Peyara standards:** `~/Desktop/Peyara/CLAUDE.md` (v2.0 — observe first, no confirmation bias, learning loop)
+- **Peyara standards:** `~/Desktop/Peyara/CLAUDE.md` (v2.0 — observe first, no confirmation bias, learning loop, objectivity over agreement)
 - **Latest learnings:** `LEARNINGS.md` (most recent entry at top)
 
 ## What To Do Next
