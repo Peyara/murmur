@@ -6,6 +6,27 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-27 — Production — Sprint 1A Sessions A+B complete, 24h observation clock running
+
+**Session-end meta-findings (covers both Sessions A+B)**
+
+**CLAUDE.md Exceptions**
+- "One feature per session" — bundled Sprint 1A foundation. One-off.
+- "No real GCP IDs in source" — violated in Session B, caught in review, scrubbed. PreToolUse hook added.
+- "Tests before code" — hydration tests written alongside. One-off.
+- "PR review: independent opinion before Copilot" — drifted on PR #12. Must read diff first, form own view.
+
+**Process Improvements**
+- PreToolUse hook added to `~/.claude/settings.json` — scans git push diffs for sensitive patterns (emails, project IDs, API keys, SA keys, tokens). Blocks push if found.
+- PR review must: read full diff → form opinion → THEN compare with Copilot. Not triage Copilot first.
+
+**CLAUDE.md Evolution Candidates**
+- "Never commit sensitive identifiers — use env var placeholders + PreToolUse hook" → **promote**
+- "PR review: form independent opinion before reading Copilot" → **promote**
+- "Baseline design must be observation-first, not invariant-first" → **watch** (already in Peyara standards)
+
+---
+
 ### 2026-03-26 — Production — Sprint 1A Session B: activity generator deployed, correlation validated on real data
 
 **Session Summary**
