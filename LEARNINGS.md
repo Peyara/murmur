@@ -6,6 +6,41 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-28 — Production — Mini session: deploy maintainer service (Workflow 2)
+
+**Session Summary**
+- Mode: Production (mini session)
+- Deployed Workflow 2 (maintainer) — separate Cloud Run service + SA, hourly scheduler trigger
+- Generates SECRET (AddSecretVersion), IDENTITY (GenerateAccessToken), CONTROL (SetIamPolicy x2) events hourly
+- PR #14 merged. Maintainer live and accumulating.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Separate maintainer service + SA | Add endpoint to existing worker | Need distinct actor for multi-actor baseline |
+| GenerateAccessToken for IDENTITY zone | CreateServiceAccountKey + DeleteServiceAccountKey | Org policy blocks key creation (`constraints/iam.disableServiceAccountKeyCreation`) |
+| IAM binding toggle (add + remove) for CONTROL zone | Permanent IAM changes | Idempotent, no drift |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| Org policy blocks SA key creation in sandbox | Can't use CreateKey/DeleteKey for IDENTITY zone events | Adapted to GenerateAccessToken. May affect Sprint 1B attack scenarios — check if S01 needs adaptation. |
+| Protobuf repeated fields don't support Python list operations | `policy.bindings.append(Binding(...))` fails | Use `.add()` method and set fields individually |
+| Secret versions accumulate (~720/month from maintainer) | No cost but unbounded growth | Consider cleanup logic if needed later |
+
+**CLAUDE.md Exceptions**
+- "Tests before code" — no tests for deploy script/Flask app. One-off, validated by manual invocation.
+- "Plan first" — informal plan in conversation. Mini session, small scope.
+
+**Open Questions**
+1. Org policy vs Sprint 1B attack scenarios — does S01 (key creation) need adaptation?
+2. Update `known_initiators.json` with `maintenance-sa` before correlator runs on new data?
+3. Secret version cleanup strategy — needed or leave indefinite?
+
+---
+
 ### 2026-03-27 — Session-end meta-findings (Session C)
 
 **CLAUDE.md Exceptions**
