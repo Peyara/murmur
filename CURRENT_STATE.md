@@ -20,13 +20,13 @@ Sprint 1A Session B (2026-03-26): Real worker deployed, correlation validated on
 
 ## Open Blockers / Questions
 
-1. 24h observation in progress — do NOT build detection code until Session C
-2. Hydration validator mismatch (deploy noise) — verify self-resolves in Session C
-3. Correlation confidence weights — calibrate against real latency distributions (Session C)
-4. Docker-* audit methods from Cloud Build — ACTION_MAP decision after observation
+1. ~~24h observation in progress~~ — DONE (Session C complete)
+2. Hydration validator mismatch (deploy noise) — verify self-resolves with 5 days of data
+3. Correlation confidence weights — 25 medium-confidence events (0.50-0.89) need investigation
+4. Docker-* audit methods from Cloud Build — mapped to OTHER/DATA, acceptable (82 events, deploy-only)
 5. Detection latency: GCS sink batch vs Cloud Logging API — post-MVP
 6. Self-learning parser — Sprint 2-3, issue to be created
-7. Schema migration for existing DuckDB files — Sprint 3
+7. Schema migration for existing DuckDB files — Sprint 3. **Note:** `delegation_chain` column added in Session C. Existing DuckDB files need: `ALTER TABLE events ADD COLUMN delegation_chain VARCHAR DEFAULT '[]';`
 8. EXFIL_RISK pattern tuning — pending from issue #2
 
 ## Files to Read for Context

@@ -5,6 +5,7 @@ Maps raw GCP audit log JSON entries to the canonical event schema.
 patterns across 13 action types and 6 trust zones.
 """
 
+import json
 import logging
 from datetime import datetime
 
@@ -157,6 +158,15 @@ def parse_audit_log(raw: dict) -> CanonicalEvent:
     actor_id = auth_info.get("principalEmail", "unknown")
     actor_type = _resolve_actor_type(actor_id)
 
+    # Delegation chain — extract SA emails from serviceAccountDelegationInfo
+    delegation_entries = auth_info.get("serviceAccountDelegationInfo", [])
+    delegation_emails = []
+    for entry in delegation_entries:
+        fpp = entry.get("firstPartyPrincipal", {})
+        email = fpp.get("principalEmail")
+        if email:
+            delegation_emails.append(email)
+
     # Action + zone
     action_type, target_zone = _resolve_action(service_name, method_name)
 
@@ -214,5 +224,6 @@ def parse_audit_log(raw: dict) -> CanonicalEvent:
         provenance_level=provenance_level,
         provenance_source=provenance_source,
         is_infrastructure=_is_infrastructure_actor(actor_id),
+        delegation_chain=json.dumps(delegation_emails),
         raw_ref=f"{log_name}:{insert_id}" if log_name else insert_id,
     )

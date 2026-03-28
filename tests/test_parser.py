@@ -390,6 +390,47 @@ class TestFieldExtraction:
         assert event.provenance_level == ProvenanceLevel.WEAK
 
 
+# ── Delegation chain tests ──────────────────────────────────────────────
+
+
+class TestDelegationChain:
+    def test_extracts_delegation_chain(self):
+        raw = _make_raw_log("storage.googleapis.com", "storage.objects.get")
+        raw["protoPayload"]["authenticationInfo"]["serviceAccountDelegationInfo"] = [
+            {"firstPartyPrincipal": {"principalEmail": "robot@serverless-robot-prod.iam.gserviceaccount.com"}},
+        ]
+        event = parse_audit_log(raw)
+        import json
+        chain = json.loads(event.delegation_chain)
+        assert chain == ["robot@serverless-robot-prod.iam.gserviceaccount.com"]
+
+    def test_multiple_delegation_entries(self):
+        raw = _make_raw_log("storage.googleapis.com", "storage.objects.get")
+        raw["protoPayload"]["authenticationInfo"]["serviceAccountDelegationInfo"] = [
+            {"firstPartyPrincipal": {"principalEmail": "build@gcp-sa-cloudbuild.iam.gserviceaccount.com"}},
+            {"firstPartyPrincipal": {"principalEmail": "robot@serverless-robot-prod.iam.gserviceaccount.com"}},
+        ]
+        event = parse_audit_log(raw)
+        import json
+        chain = json.loads(event.delegation_chain)
+        assert len(chain) == 2
+        assert "build@gcp-sa-cloudbuild.iam.gserviceaccount.com" in chain
+        assert "robot@serverless-robot-prod.iam.gserviceaccount.com" in chain
+
+    def test_empty_delegation_chain_when_absent(self):
+        raw = _make_raw_log("storage.googleapis.com", "storage.objects.get")
+        event = parse_audit_log(raw)
+        assert event.delegation_chain == "[]"
+
+    def test_handles_missing_first_party_principal(self):
+        raw = _make_raw_log("storage.googleapis.com", "storage.objects.get")
+        raw["protoPayload"]["authenticationInfo"]["serviceAccountDelegationInfo"] = [
+            {"thirdPartyPrincipal": {"thirdPartyClaims": {}}},
+        ]
+        event = parse_audit_log(raw)
+        assert event.delegation_chain == "[]"
+
+
 # ── Edge case tests ─────────────────────────────────────────────────────
 
 

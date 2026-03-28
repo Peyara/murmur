@@ -60,8 +60,8 @@ class TestIngestSample:
         conn = duckdb.connect(tmp_db)
         count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         conn.close()
-        # 6 normal_scheduled + 6 key_secret_attack + 1 quiet_window = 13
-        assert count == 13
+        # 6 normal_scheduled + 6 key_secret_attack + 1 quiet_window + 6 multi_format/audit = 19
+        assert count == 19
 
     def test_idempotent_reingest(self, runner, tmp_db):
         runner.invoke(cli, ["init-db", "--db-path", tmp_db])
@@ -72,7 +72,7 @@ class TestIngestSample:
         conn = duckdb.connect(tmp_db)
         count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         conn.close()
-        assert count == 13  # duplicates rejected
+        assert count == 19  # duplicates rejected
 
 
 class TestIngestFile:

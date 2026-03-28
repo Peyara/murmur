@@ -21,7 +21,7 @@ from config.settings import SETTINGS
 from src.ingest.cloudrun_parser import CloudRunRequest
 from src.ingest.correlate import ServiceWorkerMap, correlate_events
 from src.ingest.dedup import insert_event
-from src.ingest.multi_parser import dispatch_parse
+from src.ingest.multi_parser import can_parse_audit, dispatch_parse
 from src.ingest.parser import parse_audit_log
 from src.ingest.provenance_ingest import enrich_provenance
 from src.ingest.scheduler_parser import SchedulerExecution
@@ -62,9 +62,10 @@ class LocalFetcher:
     def list_blobs(self, prefix: str | None = None) -> list[str]:
         if not self._dir.exists():
             return []
+        # Recurse into subdirectories (mirrors GCS nested path structure)
         names = sorted(
-            f.name
-            for f in self._dir.iterdir()
+            str(f.relative_to(self._dir))
+            for f in self._dir.rglob("*")
             if f.is_file() and f.suffix in (".json", ".jsonl")
         )
         if prefix is not None:
@@ -218,6 +219,9 @@ def _ingest_content(
             continue
         try:
             raw = json.loads(line)
+            if not can_parse_audit(raw):
+                skipped += 1
+                continue
             event = parse_audit_log(raw)
             event = enrich_provenance(event, known_initiators)
             if insert_event(db, event):
@@ -296,6 +300,12 @@ def fetch_and_ingest_multi(
         prefixes = SETTINGS.gcs_prefixes
     if service_worker_map is None:
         service_worker_map = SETTINGS.service_worker_map
+
+    if not service_worker_map:
+        logger.warning(
+            "service_worker_map is empty — correlation will produce zero results. "
+            "Set GCP_PROJECT_ID in .env or pass service_worker_map explicitly."
+        )
 
     known_initiators = SETTINGS.load_known_initiators()
 

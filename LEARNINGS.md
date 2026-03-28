@@ -6,6 +6,53 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-27 — R&D — Session C: 24h real data inspection
+
+**Session Summary**
+- Mode: R&D + local
+- Pulled 5 days of real GCS audit logs (3,415 entries, 166 files, 4.8MB) to local snapshot.
+- Ran inspector (zero-knowledge structure discovery) and ingestion pipeline in parallel on real data.
+- All 3 parsers at 100% parse rate. Correlation at 99.7% (1,509/1,513 worker events). 7 actors discovered.
+- Full RD report: `docs/rd_reports/2026-03-27_session_c_24h_inspection.md`
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Keep all 5 days of data (including deploy noise) | Filter to 24h window only | Deploy noise is a better stress test — validates layered scoring handles messy reality |
+| LocalFetcher recursive by default | Flatten downloads / create adapter | Recursive is the correct behavior — GCS sink always uses nested paths |
+| Don't parse stderr/varlog | Add parsers for all formats | No actor identity, no audit signal. Application-level logs. Low detection value. |
+| Prioritize delegation chain extraction | Defer to Sprint 2+ | Delegation chain is a first-class anomaly signal for stolen credentials — needed for Sprint 1B attack injection |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| `service_worker_map` silently empties without env vars | Pipeline produces 0 correlations with no error. Production risk. | Add startup validation. Priority 1 fix. |
+| Delegation chain is an anomaly signal | Absence of `serverless-robot-prod` in worker events = stolen credential | Extract to CanonicalEvent. Priority 2. |
+| 7 actors, not 6 | `service-agent-manager@system.gserviceaccount.com` does IAM_SET_POLICY | Add to infrastructure allow-list. |
+| EXFIL_RISK zone completely empty | No baseline for exfil detection | Design decision: first-ever zone event = maximum novelty by definition? |
+| system_event logs contain deploy metadata | 9 events with deployer identity, image hash, config changes | Add system_event parser for deploy detection. Priority 3. |
+| Zone flux 57% sparse, dominated by SECRET<->DATA | Worker creates 2 zone pairs. Human creates 17. | Correct by design — sparse baseline means transitions are novel. |
+| Inspector independently found scheduler->audit join key | Validates our correlation approach from first principles | Confidence boost. |
+| Human user-agent has 113 variants vs worker's 1 | callerSuppliedUserAgent alone distinguishes human from automated | Free signal for actor fingerprinting. |
+
+**Learning Loop**
+
+1. **Assumed:** 6 actors, all formats parseable, env vars always available at runtime.
+2. **Observed:** 7 actors, 3 additional log formats, silent failure without env vars.
+3. **Broke:** Actor count assumption (minor). Silent correlation failure (major). All-formats-parseable (minor — correct rejection).
+4. **Adapted:** Added startup validation to fix list. Delegation chain promoted from metadata to signal. system_event parser added to roadmap.
+5. **Principles:** (a) Any configuration-dependent pipeline step must fail loudly when misconfigured, not silently degrade. (b) Absence of expected metadata (delegation chain) is itself an anomaly signal — model what should be present, not just what is present.
+6. **Next time:** Source `.env` as part of the analysis script, not as a manual step. Consider a `murmur doctor` command that validates configuration completeness.
+
+**Open Questions**
+1. 25 medium-confidence correlations (0.50-0.89) — edge cases or systematic issue?
+2. EXFIL_RISK baseline: synthesize during attack injection, or treat first-ever zone event as maximum novelty?
+3. `ReplaceService` -> ACTION_MAP: add as `COMPUTE_UPDATE` or leave as OTHER?
+
+---
+
 ### 2026-03-27 — Production — Sprint 1A Sessions A+B complete, 24h observation clock running
 
 **Session-end meta-findings (covers both Sessions A+B)**
