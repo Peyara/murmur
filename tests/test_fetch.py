@@ -117,6 +117,51 @@ class TestLocalFetcher:
         with pytest.raises(ValueError, match="not a directory"):
             LocalFetcher(str(file_path))
 
+    def test_list_blobs_recurses_into_subdirectories(self, tmp_path):
+        """LocalFetcher discovers files in nested subdirectories (GCS sink structure)."""
+        from src.ingest.fetch import LocalFetcher
+
+        # Mimic GCS sink: cloudaudit.googleapis.com/data_access/2026/03/27/file.json
+        nested = tmp_path / "cloudaudit.googleapis.com" / "data_access" / "2026"
+        nested.mkdir(parents=True)
+        (nested / "hour_00.json").write_text('{"a": 1}')
+        (nested / "hour_01.json").write_text('{"b": 2}')
+        # Also a file at root level
+        (tmp_path / "flat.json").write_text('{"c": 3}')
+
+        fetcher = LocalFetcher(str(tmp_path))
+        blobs = fetcher.list_blobs()
+
+        assert len(blobs) == 3
+        assert "flat.json" in blobs
+        assert "cloudaudit.googleapis.com/data_access/2026/hour_00.json" in blobs
+        assert "cloudaudit.googleapis.com/data_access/2026/hour_01.json" in blobs
+
+    def test_list_blobs_recursive_with_prefix_filter(self, tmp_path):
+        from src.ingest.fetch import LocalFetcher
+
+        sub_a = tmp_path / "cloudaudit.googleapis.com"
+        sub_a.mkdir()
+        (sub_a / "events.json").write_text("{}")
+        sub_b = tmp_path / "run.googleapis.com"
+        sub_b.mkdir()
+        (sub_b / "requests.json").write_text("{}")
+
+        fetcher = LocalFetcher(str(tmp_path))
+        blobs = fetcher.list_blobs(prefix="cloudaudit")
+        assert blobs == ["cloudaudit.googleapis.com/events.json"]
+
+    def test_read_blob_with_relative_path(self, tmp_path):
+        from src.ingest.fetch import LocalFetcher
+
+        nested = tmp_path / "sub" / "dir"
+        nested.mkdir(parents=True)
+        (nested / "data.json").write_text('{"nested": true}')
+
+        fetcher = LocalFetcher(str(tmp_path))
+        content = fetcher.read_blob("sub/dir/data.json")
+        assert '"nested": true' in content
+
 
 # ---------------------------------------------------------------------------
 # Checkpoint tests
@@ -560,3 +605,20 @@ class TestFetchAndIngestMulti:
         stats2 = fetch_and_ingest_multi(**kwargs)
         assert stats1["inserted"] == 1
         assert stats2["blobs_processed"] == 0  # nothing new to process
+
+    def test_warns_on_empty_service_worker_map(self, fetch_db, multi_format_dir, caplog):
+        """Empty service_worker_map logs a warning — prevents silent correlation failure."""
+        import logging
+
+        from src.ingest.fetch import fetch_and_ingest_multi
+
+        source = _PrefixLocalFetcher(multi_format_dir)
+        with caplog.at_level(logging.WARNING, logger="src.ingest.fetch"):
+            fetch_and_ingest_multi(
+                db=fetch_db,
+                source=source,
+                source_id_prefix="test",
+                prefixes=["cloudaudit.googleapis.com"],
+                service_worker_map={},
+            )
+        assert "service_worker_map is empty" in caplog.text

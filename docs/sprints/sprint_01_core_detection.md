@@ -235,7 +235,42 @@ Debug and fix. Common issues:
 - `root_trigger_id` exists as a native label on Compute Engine operations — proof GCP CAN propagate trigger IDs, just not for Scheduler.
 - Full evidence: `docs/rd_reports/2026-03-25_trigger_ref_discovery.md`
 
-_Sprint 1 findings updated as work progresses:_
+**Session C findings (2026-03-27): 24h real data inspection**
+
+Pipeline health (pre-validation — scoring/invariants not yet built):
+- [x] Parse rate >90%: audit 100%, scheduler 100%, Cloud Run 100%
+- [x] Correlation accuracy >80%: 99.7% (1,509/1,513 worker events correlated)
+- [ ] Action type coverage >80%: 91.6% (1,946/2,125 events mapped to specific types). 179 OTHER events from unmapped methods.
+
+Bias check (observation-first):
+- [x] Inspector report on real data BEFORE pipeline evaluation: `docs/rd_reports/2026-03-27_session_c_24h_inspection.md`
+- [x] 2+ blind spots documented: (1) EXFIL_RISK zone empty, (2) system_event not parsed, (3) delegation chain not modeled, (4) GCP internal SA IAM changes, (5) unknown actor events, (6) KMS/BQ untested
+- [x] 1+ legitimate activity type handled poorly: GCP internal `service-agent-manager` IAM_SET_POLICY events indistinguishable from attacker IAM modifications without actor allow-listing
+
+Key findings:
+- 7 actors (not 6): `service-agent-manager@system.gserviceaccount.com` discovered
+- Delegation chain is a first-class anomaly signal (absence = stolen credential)
+- `service_worker_map` silently empties without env vars — production risk
+- Zone flux matrix 57% sparse. Worker: SECRET<->DATA only. Human: all 5 zones.
+- 35 entries from stderr/varlog/system_event correctly rejected by parsers
+
+Full report: `docs/rd_reports/2026-03-27_session_c_24h_inspection.md`
+
+**Session C fixes (completed):**
+- [x] Fix silent correlation failure: startup validation when `service_worker_map` is empty (warning in `fetch_and_ingest_multi`)
+- [x] Add `delegation_chain` to CanonicalEvent + parser extraction (JSON array of delegation SA emails, stored in events table). Validated: 100% of worker events have `serverless-robot-prod` delegation chain.
+
+**Parked for Sprint 1B (attack injection phase):**
+- [ ] EXFIL_RISK baseline: (a) treat first-ever zone event as maximum novelty in scoring layer, (b) exercise zone during attack injection by creating a `temp-export-*` bucket
+- [ ] system_event parser: new `system_event_parser.py` for Cloud Run revision deployments. Extracts deployer identity, image hash, scaling config. Map to `COMPUTE_UPDATE` / `COMPUTE` zone. Needed for deploy-based attack detection.
+- [ ] GCP internal SA allow-list: add `service-agent-manager@system.gserviceaccount.com` to `known_initiators.json` with infrastructure tag. Prevents invariant false positives on GCP internal IAM maintenance.
+- [ ] `ReplaceService` -> ACTION_MAP: add `("run.googleapis.com", "ReplaceService")` -> `(COMPUTE_UPDATE, COMPUTE)`. New `COMPUTE_UPDATE` action type.
+- [ ] Investigate 25 medium-confidence correlations (0.50-0.89) — edge cases or systematic?
+
+**Parked for post-MVP:**
+- [ ] KMS_DECRYPT / BQ_JOB_SUBMIT validation: no real data to test against. Validate when sandbox uses these services.
+- [ ] stderr/varlog parsing: application-level logs with no actor identity. Revisit if instance lifecycle tracking becomes relevant.
+- [ ] `murmur doctor` CLI command: validate configuration completeness (env vars, service_worker_map, known_initiators, GCS connectivity).
 
 ---
 

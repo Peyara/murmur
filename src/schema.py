@@ -121,6 +121,9 @@ class CanonicalEvent:
     # --- Correlation ---
     correlation_confidence: float = 0.0  # 0.0-1.0 composite confidence for derived trigger_ref
 
+    # --- Delegation ---
+    delegation_chain: str = "[]"  # JSON array of delegation SA emails from serviceAccountDelegationInfo
+
     # --- Context ---
     project_id: str | None = None
     env: str = "sandbox"

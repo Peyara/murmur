@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS events (
     target_type         VARCHAR NOT NULL,
     target_zone         VARCHAR NOT NULL,      -- CONTROL | IDENTITY | SECRET | DATA | COMPUTE | EXFIL_RISK
     correlation_confidence FLOAT DEFAULT 0.0,    -- 0.0-1.0 composite confidence for derived trigger_ref
+    delegation_chain    VARCHAR DEFAULT '[]',   -- JSON array of delegation SA emails (from serviceAccountDelegationInfo)
     result              VARCHAR NOT NULL DEFAULT 'SUCCESS',
     project_id          VARCHAR,
     env                 VARCHAR DEFAULT 'sandbox',
