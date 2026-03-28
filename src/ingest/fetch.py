@@ -21,7 +21,7 @@ from config.settings import SETTINGS
 from src.ingest.cloudrun_parser import CloudRunRequest
 from src.ingest.correlate import ServiceWorkerMap, correlate_events
 from src.ingest.dedup import insert_event
-from src.ingest.multi_parser import dispatch_parse
+from src.ingest.multi_parser import can_parse_audit, dispatch_parse
 from src.ingest.parser import parse_audit_log
 from src.ingest.provenance_ingest import enrich_provenance
 from src.ingest.scheduler_parser import SchedulerExecution
@@ -219,6 +219,9 @@ def _ingest_content(
             continue
         try:
             raw = json.loads(line)
+            if not can_parse_audit(raw):
+                skipped += 1
+                continue
             event = parse_audit_log(raw)
             event = enrich_provenance(event, known_initiators)
             if insert_event(db, event):

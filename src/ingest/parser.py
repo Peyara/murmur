@@ -224,6 +224,6 @@ def parse_audit_log(raw: dict) -> CanonicalEvent:
         provenance_level=provenance_level,
         provenance_source=provenance_source,
         is_infrastructure=_is_infrastructure_actor(actor_id),
-        delegation_chain=json.dumps(delegation_emails) if delegation_emails else "[]",
+        delegation_chain=json.dumps(delegation_emails),
         raw_ref=f"{log_name}:{insert_id}" if log_name else insert_id,
     )
