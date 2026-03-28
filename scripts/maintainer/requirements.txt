@@ -1,0 +1,4 @@
+flask==3.1.1
+gunicorn==23.0.0
+google-cloud-secret-manager==2.23.1
+google-cloud-iam==2.21.0
