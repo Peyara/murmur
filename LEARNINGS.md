@@ -6,6 +6,30 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-27 — Session-end meta-findings (Session C)
+
+**CLAUDE.md Exceptions**
+- "One feature per session" — bundled inspection + fixes + design discussion. R&D session, one-off.
+- "Tests before code" — tests written alongside for small targeted fixes. R&D mode, one-off.
+- "Plan first" — fixes executed without formal plan-approve. Agreed during brainstorm, small scope, one-off.
+
+**Process Improvements**
+- PR review caught a real bug (#3: `--sample` mis-parsing non-audit files). Test count changes should always be investigated, not just accepted.
+- Silent configuration failures are production risks. The `service_worker_map` empty warning prevented a class of "everything looks fine but nothing works" bugs.
+
+**CLAUDE.md Evolution Candidates**
+- "Pipeline config must fail loudly when misconfigured" → **promote** (general principle)
+- "Absence of expected metadata is an anomaly signal" → **watch** (may be too domain-specific)
+- "PR review: investigate test count changes" → **promote** (generalizable)
+
+**Design Decisions for Session D**
+- Zone flux matrix hydration: tiered confidence (Cold/Warm/Calibrated) as primary mechanism
+- Zero-baseline zone pairs: novelty scoring only, not sigma_coarse
+- Deploy Workflow 2 (maintainer) before or alongside Session D for richer baseline
+- No synthetic activity spike — sparsity is the signal, attack injection validates it
+
+---
+
 ### 2026-03-27 — R&D — Session C: 24h real data inspection
 
 **Session Summary**
