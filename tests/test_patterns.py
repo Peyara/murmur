@@ -9,7 +9,6 @@ from src.provenance.patterns import (
     list_patterns,
     register_pattern,
 )
-from tests.conftest import make_event
 
 W1 = datetime(2026, 3, 28, 10, 0, 0)  # Friday, 10:00 UTC
 

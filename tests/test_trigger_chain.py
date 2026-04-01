@@ -1,9 +1,7 @@
 """Tests for provenance trigger chain resolution."""
 
-from datetime import datetime
 
 from src.provenance.trigger_chain import TriggerChain, resolve_trigger_chain
-
 
 KNOWN = {
     "service-123@gcp-sa-cloudscheduler.iam.gserviceaccount.com",
