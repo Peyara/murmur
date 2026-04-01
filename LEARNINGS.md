@@ -6,6 +6,54 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-31 — Production — Session E: Provenance scaffold + multi-format ingest fix
+
+**Session Summary**
+- Mode: Production, local
+- Built provenance scaffold: pattern matching (4-component), trigger chain resolution, signature stub, residual risk computation. Fixed `ingest --local-dir` to use multi-format correlation pipeline. 4 CLI commands. PR #15 (Session D) reviewed + merged. PR #16 (Session E) reviewed, CI green, ready to merge.
+- 350 tests green (+35 new). Validated on real data: normal-worker-sa gets 14% discount (6261/6267 events correlated at 0.996 confidence).
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Discount applies to fusion_raw whole, not per-invariant | Suppress invariants for matched patterns | Complexity — invariant layer needs pattern awareness. Sprint 2. |
+| Chain-resolved WEAK boost (0.6→0.8) | Equal WEAK; promote to STRONG | Equal doesn't reward explainability. STRONG conflates temporal with cryptographic. |
+| Benchmark deferred to R&D review | Include in Session E | Tests full pipeline — natural to combine with data review. One feature per session. |
+| `--local-dir` → multi-format pipeline | Keep single-format | Single-format never populates trigger_ref. Provenance layer is dead without it. |
+| Pattern cache per scoring run | Query each call; global cache | Per-call = N×801 scans. Global adds state. Passing list is simple. |
+| Actor match: exact local-part | Prefix (startswith) | Prefix too broad — `sa-attacker@evil` matches `sa@proj`. Copilot caught this. |
+| Zone matching: LCS ratio | Edit distance; exact | Edit distance asymmetric. Exact too strict. LCS captures subsequence similarity. |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| `ingest --local-dir` was single-format — trigger_ref always NULL | Entire provenance layer was dead on local data | Fixed: multi-format pipeline for --local-dir and --gcs-bucket |
+| normal-worker-sa: 14% discount (expected ~22%) | Pattern match scores vary per window (zone sequences not identical) | Acceptable — weights tune in Sprint 1B |
+| maintenance-sa: 0% discount | service_worker_map missing maintainer mapping | Config fix: add `{"maintainer": "maintenance-sa@..."}` |
+| Copilot found 3 issues Claude missed: unused param, threshold mismatch, input validation | Multi-source review catches different categories | Validates complementary review approach |
+
+**PR Review Findings (all fixed)**
+- Claude: pattern cache per run, exact local-part match, idempotent match_count, doc single-project assumption (cbd2438)
+- Copilot: remove unused window_start param, threshold on residual not fusion, input validation for register-pattern (7bb7986)
+
+**CLAUDE.md Exceptions**
+- "One feature per session" — covered Session D wrap-up + Session E build. Session D was residual review/merge work. One-off.
+
+**Open Questions**
+1. maintenance-sa not correlated — service_worker_map config fix needed
+2. 14% vs 22% discount — pattern match varies per window, tune in Sprint 1B
+3. Per-invariant suppression — Sprint 2 enhancement
+4. Benchmark scenarios deferred to R&D review session
+5. PR #16 needs merge
+
+**CLAUDE.md Evolution Candidates**
+- "Wire integration paths early — a layer that can't receive input is dead code" → **promote**
+- "Multi-source review catches complementary issues" → **watch**
+
+---
+
 ### 2026-03-31 — Production — Session D: World model + scoring layers
 
 **Session Summary**
