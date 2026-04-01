@@ -14,7 +14,7 @@ For current state / resume point, see `CURRENT_STATE.md`.
 - CLI commands: `murmur window`, `murmur score`.
 - Validated on 7+ days real GCP data: 5607 events, 8 actors, 350 windows. sigma_coarse max 3.52, 20 bridges.
 - Data refresh: 431 files (12MB) including maintainer events.
-- PR #15 created. 315 tests green.
+- PR #15 reviewed (Claude + Copilot), all 7 findings fixed, CI green, merged to main.
 
 **Decisions**
 
@@ -50,9 +50,19 @@ For current state / resume point, see `CURRENT_STATE.md`.
 3. 25 medium-confidence correlations (0.50-0.89) still uninvestigated.
 4. service-agent-manager INV_001 false positive — Sprint 1B allow-list fix.
 
+**PR Review Findings (all fixed)**
+- Unused import `get_bridge_new` in fusion.py — removed
+- Fragile positional `CanonicalEvent(*row)` unpacking — documented column order (Claude+Copilot)
+- Unbounded EMA history in physics.py — bounded to 90-day lookback (Claude+Copilot)
+- N+1 queries in INV_006/INV_008 — batched into single IN query (Claude)
+- Magic `/10` threshold in CLI — named vars + comment (Claude+Copilot)
+- Tiered confidence boundary off-by-one: obs=50 was Calibrated, should be Warm — fixed `<` to `<=` (Copilot)
+- CI: pre-existing maintainer/app.py lint + S608/B608 false positive suppressions
+
 **CLAUDE.md Evolution Candidates**
 - "Validate signal contribution, not just signal existence" — sigma exists but contributes ~3%. → **watch**
 - "Skip-zero vs smoothing is a recurring sparse-data design choice" → **watch**
+- "CI lint runs on all files, not just changed" — pre-existing lint in scripts/maintainer broke CI on unrelated PR. → **watch** (consider per-directory ruff config or fixing all lint debt upfront)
 
 ---
 
