@@ -86,14 +86,17 @@ class MurmurSettings:
             return set()
         with open(path) as f:
             raw = set(json.load(f))
-        # Resolve PROJECT_NUMBER placeholder from GCP_PROJECT_NUMBER env var
+        # Resolve placeholders from env vars
         project_number = os.environ.get("GCP_PROJECT_NUMBER", "")
+        project_id = os.environ.get("GCP_PROJECT_ID", "")
         resolved = set()
         for sa in raw:
-            if "PROJECT_NUMBER" in sa and project_number:
-                resolved.add(sa.replace("PROJECT_NUMBER", project_number))
-            else:
-                resolved.add(sa)
+            entry = sa
+            if "PROJECT_NUMBER" in entry and project_number:
+                entry = entry.replace("PROJECT_NUMBER", project_number)
+            if "PROJECT_ID" in entry and project_id:
+                entry = entry.replace("PROJECT_ID", project_id)
+            resolved.add(entry)
         return resolved
 
 
