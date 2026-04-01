@@ -6,6 +6,56 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-03-31 — Production — Session D: World model + scoring layers
+
+**Session Summary**
+- Mode: Production, local
+- Built world model layer (window.py, graph.py) and scoring layer (invariants.py, physics.py, novelty.py, fusion.py). 8 source files, 6 test files, 2141 lines, 94 new tests.
+- CLI commands: `murmur window`, `murmur score`.
+- Validated on 7+ days real GCP data: 5607 events, 8 actors, 350 windows. sigma_coarse max 3.52, 20 bridges.
+- Data refresh: 431 files (12MB) including maintainer events.
+- PR #15 created. 315 tests green.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Schnakenberg skip-zero (pairs with zero in either direction = 0) | Laplace smoothing; raw asymmetry Σ\|J_ij-J_ji\| | Laplace introduces tuning param; raw asymmetry loses log compression. Novelty handles unidirectional. Revisit Sprint 1B. |
+| burst_per_min uses actual event span (1-min floor) | Fixed 15-min denominator | Fixed 15 makes single-event windows identical; actual span captures burstiness |
+| Edge newness at zone-pair level, not target_id level | Per-target_id newness | Anomaly signal is "new zone traversal pattern" — specific target doesn't matter |
+| Tiered confidence: Cold <5, Warm 5-50, Calibrated >50 cumulative | Per-window; adaptive | Cumulative is simpler, Calibrated after ~4h. Adaptive adds complexity without validation. |
+| EMA from history (no state table) | Separate EMA state table | Cheap at scale. Avoids stale state bugs. |
+| Fusion weights: inv 0.35, novelty 0.20, sigma/bridge/delta 0.10 each, burst 0.08, entropy 0.07 | Equal; learned | Heuristic initial. inv heavily weighted (deterministic). Sprint 1B calibrates. |
+| Session D = world model + scoring only | Include provenance; full 1A remainder | Tight coupling = one feature. Provenance is separate concern. |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| sigma_coarse max 3.52, non-trivial on real data | Schnakenberg entropy produces meaningful signal | Good — validates the physics approach |
+| sigma_coarse contributes ~3% of fusion at max | Invariants + novelty carry ~90% of detection | Acceptable for Sprint 1A. Sprint 1B validates whether sigma adds power beyond invariants. |
+| Schnakenberg skip-zero = blind to purely unidirectional attack chains | The exact scenario it should detect contributes 0 | Novelty compensates. Revisit formula if Sprint 1B shows gap. |
+| maintenance-sa mean score 0.32 (expected lower) | INV_004 fires every window (impersonation is its job) | Provenance discount (Session E) will suppress known-pattern invariants |
+| INV_003 fired on maintenance-sa | known_initiators doesn't resolve without GCP_PROJECT_ID env var | Runtime config issue, not code bug |
+| normal-worker-sa mean 0.06, human admin peak 0.75 | Good signal separation between scheduled and ad-hoc activity | Validates scoring approach |
+| 350 windows, 494 actor-window pairs, 3341 edges | Rich world model data from 7+ days | Sufficient for Sprint 1B validation |
+
+**CLAUDE.md Exceptions**
+- "Plan first → wait for approval" — data refresh started in parallel with test writing. Read-only from GCP, non-destructive. One-off.
+- "One feature per session" — world model + scoring treated as one feature due to tight coupling. One-off.
+
+**Open Questions**
+1. Schnakenberg blind spot: does skip-zero matter for attack detection, or do novelty/invariants compensate? Sprint 1B will answer.
+2. Fusion normalization bounds are guesses (sigma max=10, observed max=3.52). Empirically set in Sprint 1B.
+3. 25 medium-confidence correlations (0.50-0.89) still uninvestigated.
+4. service-agent-manager INV_001 false positive — Sprint 1B allow-list fix.
+
+**CLAUDE.md Evolution Candidates**
+- "Validate signal contribution, not just signal existence" — sigma exists but contributes ~3%. → **watch**
+- "Skip-zero vs smoothing is a recurring sparse-data design choice" → **watch**
+
+---
+
 ### 2026-03-28 — Production — Mini session: deploy maintainer service (Workflow 2)
 
 **Session Summary**

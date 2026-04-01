@@ -4,11 +4,11 @@
 
 ## Active Sprint
 
-**Sprint 1A: Core Detection Build** — Sessions A+B+C complete. Maintainer deployed. Session D target: world model + scoring layers.
+**Sprint 1A: Core Detection Build** — Sessions A-D complete. Session E target: provenance scaffold (patterns, trigger chain, residual risk, benchmark).
 
 ## Last Completed Milestone
 
-Mini session (2026-03-28): Deployed Workflow 2 (maintainer service). Hourly IDENTITY/CONTROL/SECRET zone events accumulating from `maintenance-sa`. PR #14 merged.
+Session D (2026-03-31): World model + scoring layers built and validated on real data. PR #15 created. 315 tests green. 5607 events, 8 actors, 350 windows scored.
 
 ## GCP Sandbox Status (all live, accumulating data)
 
@@ -17,29 +17,29 @@ Mini session (2026-03-28): Deployed Workflow 2 (maintainer service). Hourly IDEN
 - Scheduler jobs: trigger-normal-worker (5min), trigger-health-check (hourly), trigger-cleanup (daily), trigger-maintainer (hourly)
 - SAs: normal-worker-sa, maintenance-sa, scheduler-sa
 - GCS sink: all 3 log types → murmur-audit-logs-sandbox
-- Secrets: secret_high, secret_low, secret_maintenance
-- Local snapshot: `data/real/` (5 days Session C data, gitignored — needs refresh for Session D)
+- Local snapshot: `data/real/` (431 files, 12MB, refreshed 2026-03-29)
 
 ## Open Blockers / Questions
 
-1. Org policy blocks SA key creation (`constraints/iam.disableServiceAccountKeyCreation`) — affects Sprint 1B attack scenario S01?
-2. Update `known_initiators.json` with `maintenance-sa` before running correlator on new data
-3. 25 medium-confidence correlations (0.50-0.89) — investigate in Session D
-4. EXFIL_RISK baseline: first-ever zone event = max novelty, or synthesize during attack injection?
-5. Schema migration for existing DuckDB files: `ALTER TABLE events ADD COLUMN delegation_chain VARCHAR DEFAULT '[]';`
-6. Secret version accumulation from maintainer (~720/month) — cleanup needed?
-7. Detection latency: GCS sink batch vs Cloud Logging API — post-MVP
+1. PR #15 needs review/merge before Session E
+2. Schnakenberg skip-zero blind spot — revisit formula in Sprint 1B if attacks aren't detected
+3. maintenance-sa scores 0.32 mean — provenance discount (Session E) should fix
+4. Fusion normalization bounds are guesses — empirically set in Sprint 1B
+5. 25 medium-confidence correlations (0.50-0.89) — investigate in Sprint 1B
+6. service-agent-manager INV_001 false positive — Sprint 1B allow-list fix
+7. R&D review session planned — dig into real data results, stress-test assumptions
 
 ## Files to Read for Context
 
-- **Sprint 1 spec:** `docs/sprints/sprint_01_core_detection.md` (includes Session C findings + parked items)
-- **Session C RD report:** `docs/rd_reports/2026-03-27_session_c_24h_inspection.md`
-- **Zone flux design notes:** `.claude/plans/eager-strolling-bumblebee.md` (tiered confidence strategy)
-- **Latest learnings:** `LEARNINGS.md` (mini session + Session C entries)
-- **Maintainer service:** `scripts/maintainer/app.py` + `deploy.sh`
+- **Sprint 1 spec:** `docs/sprints/sprint_01_core_detection.md`
+- **Session D learnings:** `LEARNINGS.md` (top entry)
+- **World model:** `src/world/window.py`, `src/world/graph.py`
+- **Scoring:** `src/score/invariants.py`, `src/score/fusion.py`
+- **Real data validation:** run `murmur init-db && murmur ingest --local-dir data/real/ && murmur window && murmur score`
 
 ## What To Do Next
 
-1. **Session D:** Refresh `data/real/` snapshot (will now include maintainer events). Build world model layer — 15-min windowing (`src/world/window.py`), zone flux 6x6 matrix (`src/world/graph.py`) with observation counts per cell, edge tracking. Apply tiered confidence design (Cold/Warm/Calibrated).
-2. **Session D:** Scoring layer — invariants, sigma_coarse (handle zero-flux cells), novelty scoring with confidence tiers, basic fusion.
-3. **Sprint 1B:** Attack injection, EXFIL_RISK baseline, system_event parser, GCP SA allow-list.
+1. **Review + merge PR #15** (world model + scoring)
+2. **R&D review session:** Examine invariant fire patterns, sigma_coarse distribution, score separation. Stress-test assumptions about detection power.
+3. **Session E:** Provenance scaffold — patterns.py, trigger_chain.py, signature.py, residual.py. Benchmark scenarios (S01/S04/S07/B01/B02/S13).
+4. **Sprint 1B:** Attack injection, EXFIL_RISK baseline, system_event parser, GCP SA allow-list. Validate whether sigma_coarse adds detection power beyond invariants+novelty.
