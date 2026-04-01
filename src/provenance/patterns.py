@@ -77,6 +77,8 @@ def _match_actor(actor_id: str, expected_actors: list[str]) -> float:
         return 1.0  # no constraint
     actor_local = actor_id.split("@")[0] if "@" in actor_id else actor_id
     for expected in expected_actors:
+        if not expected:
+            continue  # skip empty entries
         if actor_id == expected:
             return 1.0
         expected_local = expected.split("@")[0] if "@" in expected else expected
@@ -140,7 +142,6 @@ def _match_rate(event_count: int, rate_min: float, rate_max: float) -> float:
 
 def compute_pattern_match(
     db: duckdb.DuckDBPyConnection,
-    window_start: datetime,
     actor_id: str,
     zone_sequence: list[str],
     event_count: int,

@@ -160,21 +160,20 @@ def score(db_path: str | None, window_start: str | None):
                 "SELECT window_start, actor_id FROM actor_windows ORDER BY window_start"
             ).fetchall()
 
-        scores = []
+        residuals = []
         for ws, actor_id in pairs:
             fusion_raw = compute_fusion(conn, ws, actor_id, known)
-            compute_residual_risk(conn, ws, actor_id, fusion_raw, known, SETTINGS,
-                                  cached_patterns=cached_patterns)
-            scores.append(fusion_raw)
+            residual = compute_residual_risk(conn, ws, actor_id, fusion_raw, known, SETTINGS,
+                                             cached_patterns=cached_patterns)
+            residuals.append(residual)
 
-        # fusion_raw is [0, 1]; settings thresholds are on [0, 10] scale.
-        # Normalize thresholds to fusion scale for comparison.
+        # residual_risk is [0, 1]; settings thresholds are on [0, 10] scale.
         high_t = SETTINGS.alert_high_threshold / 10.0
         med_t = SETTINGS.alert_med_threshold / 10.0
-        high = sum(1 for s in scores if s >= high_t)
-        med = sum(1 for s in scores if med_t <= s < high_t)
+        high = sum(1 for r in residuals if r >= high_t)
+        med = sum(1 for r in residuals if med_t <= r < high_t)
         click.echo(
-            f"Score complete: {len(scores)} (window, actor) pairs scored. "
+            f"Score complete: {len(residuals)} (window, actor) pairs scored. "
             f"High: {high}, Medium: {med}"
         )
     finally:
@@ -198,8 +197,14 @@ def register_pattern_cmd(db_path, name, description, initiator_type, actors, zon
     db_path = db_path or SETTINGS.db_path
     conn = duckdb.connect(db_path)
     try:
-        actor_list = [a.strip() for a in actors.split(",")]
-        zone_list = [z.strip() for z in zones.split(",")]
+        actor_list = [a.strip() for a in actors.split(",") if a.strip()]
+        zone_list = [z.strip() for z in zones.split(",") if z.strip()]
+        if not actor_list:
+            raise click.UsageError("--actors must contain at least one non-empty value.")
+        if not zone_list:
+            raise click.UsageError("--zones must contain at least one non-empty value.")
+        if rate_min > rate_max:
+            raise click.UsageError(f"--rate-min ({rate_min}) must be <= --rate-max ({rate_max}).")
         pid = register_pattern(
             conn, name, description, initiator_type,
             actor_list, zone_list, None, rate_min, rate_max, duration,

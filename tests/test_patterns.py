@@ -95,7 +95,7 @@ class TestActorMatch:
     def test_exact_match(self, db):
         _register_worker_pattern(db)
         score, pid = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             ["SECRET", "DATA", "DATA"], event_count=3, window_ts=W1,
         )
         assert score > 0.25  # actor component alone = 0.30
@@ -103,7 +103,7 @@ class TestActorMatch:
     def test_no_match(self, db):
         _register_worker_pattern(db)
         score, pid = compute_pattern_match(
-            db, W1, "attacker@evil.com",
+            db,"attacker@evil.com",
             ["SECRET", "DATA", "DATA"], event_count=3, window_ts=W1,
         )
         # Actor component = 0, but zone/rate may still match
@@ -114,7 +114,7 @@ class TestZoneMatch:
     def test_exact_sequence(self, db):
         _register_worker_pattern(db)
         score, _ = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             ["SECRET", "DATA", "DATA"], event_count=3, window_ts=W1,
         )
         # All 4 components should score high
@@ -123,11 +123,11 @@ class TestZoneMatch:
     def test_partial_sequence(self, db):
         _register_worker_pattern(db)
         score_exact, _ = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             ["SECRET", "DATA", "DATA"], event_count=3, window_ts=W1,
         )
         score_partial, _ = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             ["SECRET", "COMPUTE", "DATA"], event_count=3, window_ts=W1,
         )
         assert score_partial < score_exact
@@ -135,7 +135,7 @@ class TestZoneMatch:
     def test_empty_actual(self, db):
         _register_worker_pattern(db)
         score, _ = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             [], event_count=0, window_ts=W1,
         )
         assert score <= 0.5  # zone match = 0, rate match = 0
@@ -146,7 +146,7 @@ class TestTimeMatch:
         """Pattern with no expected_window matches any time."""
         _register_worker_pattern(db)  # expected_window=None
         score, _ = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             ["SECRET", "DATA", "DATA"], event_count=3, window_ts=W1,
         )
         # Time component should be 1.0 (no constraint)
@@ -164,7 +164,7 @@ class TestTimeMatch:
         )
         # W1 is Friday 10:00 UTC (weekday=4)
         score, _ = compute_pattern_match(
-            db, W1, "worker@proj", ["DATA"], event_count=5, window_ts=W1,
+            db,"worker@proj", ["DATA"], event_count=5, window_ts=W1,
         )
         assert score > 0.7
 
@@ -182,10 +182,10 @@ class TestTimeMatch:
         wednesday = datetime(2026, 3, 25, 10, 0, 0)
         sunday = datetime(2026, 3, 29, 10, 0, 0)
         score_weekday, _ = compute_pattern_match(
-            db, W1, "worker@proj", ["DATA"], event_count=5, window_ts=wednesday,
+            db,"worker@proj", ["DATA"], event_count=5, window_ts=wednesday,
         )
         score_weekend, _ = compute_pattern_match(
-            db, W1, "worker@proj", ["DATA"], event_count=5, window_ts=sunday,
+            db,"worker@proj", ["DATA"], event_count=5, window_ts=sunday,
         )
         assert score_weekend < score_weekday
 
@@ -194,7 +194,7 @@ class TestRateMatch:
     def test_within_range(self, db):
         _register_worker_pattern(db)  # rate_min=2, rate_max=6
         score, _ = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             ["SECRET", "DATA", "DATA"], event_count=3, window_ts=W1,
         )
         assert score > 0.8
@@ -202,11 +202,11 @@ class TestRateMatch:
     def test_too_fast(self, db):
         _register_worker_pattern(db)  # rate_max=6
         score_normal, _ = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             ["SECRET", "DATA", "DATA"], event_count=3, window_ts=W1,
         )
         score_fast, _ = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             ["SECRET", "DATA", "DATA"], event_count=50, window_ts=W1,
         )
         assert score_fast < score_normal
@@ -215,7 +215,7 @@ class TestRateMatch:
 class TestComposite:
     def test_no_active_patterns(self, db):
         score, pid = compute_pattern_match(
-            db, W1, "anyone@proj", ["DATA"], event_count=1, window_ts=W1,
+            db,"anyone@proj", ["DATA"], event_count=1, window_ts=W1,
         )
         assert score == 0.0
         assert pid is None
@@ -231,7 +231,7 @@ class TestComposite:
             expected_window=None, rate_min=100, rate_max=200, expected_duration=15,
         )
         score, pid = compute_pattern_match(
-            db, W1, "normal-worker-sa@proj.iam.gserviceaccount.com",
+            db,"normal-worker-sa@proj.iam.gserviceaccount.com",
             ["SECRET", "DATA", "DATA"], event_count=3, window_ts=W1,
         )
         # Should match the worker pattern, not the bad one

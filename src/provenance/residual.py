@@ -53,7 +53,7 @@ def compute_residual_risk(
 
     # Pattern matching (use cached_patterns to avoid N queries per scoring run)
     match_score, matched_pattern_id = compute_pattern_match(
-        db, window_start, actor_id, zone_sequence, event_count, window_start,
+        db, actor_id, zone_sequence, event_count, window_start,
         cached_patterns=cached_patterns,
     )
 
