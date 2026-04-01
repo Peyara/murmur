@@ -169,7 +169,10 @@ class TestIngestLocalDir:
             }
             for i in range(2)
         ]
-        (tmp_path / "batch.json").write_text("\n".join(json.dumps(e) for e in events))
+        # Multi-format pipeline expects prefix subdirectories
+        audit_dir = tmp_path / "cloudaudit.googleapis.com"
+        audit_dir.mkdir()
+        (audit_dir / "batch.json").write_text("\n".join(json.dumps(e) for e in events))
 
         runner.invoke(cli, ["init-db", "--db-path", tmp_db])
         result = runner.invoke(cli, ["ingest", "--local-dir", str(tmp_path), "--db-path", tmp_db])
@@ -198,7 +201,9 @@ class TestIngestLocalDir:
             "insertId": "i-1",
             "logName": "projects/test/logs/cloudaudit.googleapis.com%2Fdata_access",
         }
-        (tmp_path / "data.json").write_text(json.dumps(event))
+        audit_dir = tmp_path / "cloudaudit.googleapis.com"
+        audit_dir.mkdir()
+        (audit_dir / "data.json").write_text(json.dumps(event))
 
         runner.invoke(cli, ["init-db", "--db-path", tmp_db])
         runner.invoke(cli, ["ingest", "--local-dir", str(tmp_path), "--db-path", tmp_db])
@@ -245,17 +250,20 @@ class TestIngestMutualExclusivity:
 
 
 class TestIngestGcsBucket:
-    def test_gcs_bucket_calls_fetch_and_ingest(self, runner, tmp_db):
-        """--gcs-bucket wires GCSFetcher into fetch_and_ingest."""
+    def test_gcs_bucket_calls_fetch_and_ingest_multi(self, runner, tmp_db):
+        """--gcs-bucket wires GCSFetcher into fetch_and_ingest_multi."""
         from unittest.mock import MagicMock, patch
 
         runner.invoke(cli, ["init-db", "--db-path", tmp_db])
 
         mock_fetcher = MagicMock()
-        mock_stats = {"blobs_processed": 2, "inserted": 5, "skipped": 0, "parse_errors": 0}
+        mock_stats = {
+            "blobs_processed": 2, "inserted": 5, "skipped": 0, "parse_errors": 0,
+            "correlated": 3, "audit_parsed": 5, "scheduler_parsed": 2, "cloudrun_parsed": 2,
+        }
 
         with patch("src.cli.GCSFetcher", return_value=mock_fetcher) as mock_cls, \
-             patch("src.cli.fetch_and_ingest", return_value=mock_stats) as mock_fai:
+             patch("src.cli.fetch_and_ingest_multi", return_value=mock_stats) as mock_fai:
             result = runner.invoke(
                 cli, ["ingest", "--gcs-bucket", "my-bucket", "--db-path", tmp_db]
             )
