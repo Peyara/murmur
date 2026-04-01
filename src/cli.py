@@ -89,6 +89,86 @@ def ingest(
         conn.close()
 
 
+@cli.command("window")
+@click.option("--db-path", default=None, help="Path to DuckDB file.")
+@click.option("--window-start", default=None, help="ISO timestamp. If omitted, process all windows.")
+def window(db_path: str | None, window_start: str | None):
+    """Compute world model: actor_windows, edges_window, zone_flux_windows."""
+    from datetime import datetime
+
+    from src.world.graph import compute_zone_flux
+    from src.world.window import compute_actor_windows, compute_edges
+
+    db_path = db_path or SETTINGS.db_path
+    conn = duckdb.connect(db_path)
+    try:
+        if window_start:
+            windows = [(datetime.fromisoformat(window_start),)]
+        else:
+            windows = conn.execute(
+                "SELECT DISTINCT window_start FROM events ORDER BY window_start"
+            ).fetchall()
+
+        total_actors = 0
+        total_edges = 0
+        for (ws,) in windows:
+            actors = compute_actor_windows(conn, ws)
+            edges = compute_edges(conn, ws)
+            compute_zone_flux(conn, ws)
+            total_actors += actors
+            total_edges += edges
+
+        click.echo(
+            f"Window complete: {len(windows)} windows, "
+            f"{total_actors} actor-window rows, {total_edges} edge rows"
+        )
+    finally:
+        conn.close()
+
+
+@cli.command("score")
+@click.option("--db-path", default=None, help="Path to DuckDB file.")
+@click.option("--window-start", default=None, help="ISO timestamp. If omitted, score all windows.")
+def score(db_path: str | None, window_start: str | None):
+    """Compute risk scores for all (window, actor) pairs."""
+    from datetime import datetime
+
+    from src.score.fusion import compute_fusion
+
+    db_path = db_path or SETTINGS.db_path
+    conn = duckdb.connect(db_path)
+    try:
+        known = SETTINGS.load_known_initiators()
+
+        if window_start:
+            pairs = conn.execute(
+                "SELECT window_start, actor_id FROM actor_windows WHERE window_start = ?",
+                [datetime.fromisoformat(window_start)],
+            ).fetchall()
+        else:
+            pairs = conn.execute(
+                "SELECT window_start, actor_id FROM actor_windows ORDER BY window_start"
+            ).fetchall()
+
+        scores = []
+        for ws, actor_id in pairs:
+            fusion_raw = compute_fusion(conn, ws, actor_id, known)
+            scores.append(fusion_raw)
+
+        # fusion_raw is [0, 1]; settings thresholds are on [0, 10] scale.
+        # Normalize thresholds to fusion scale for comparison.
+        high_t = SETTINGS.alert_high_threshold / 10.0
+        med_t = SETTINGS.alert_med_threshold / 10.0
+        high = sum(1 for s in scores if s >= high_t)
+        med = sum(1 for s in scores if med_t <= s < high_t)
+        click.echo(
+            f"Score complete: {len(scores)} (window, actor) pairs scored. "
+            f"High: {high}, Medium: {med}"
+        )
+    finally:
+        conn.close()
+
+
 @cli.command("inspect")
 @click.argument("directory", type=click.Path(exists=True, file_okay=False))
 @click.option(

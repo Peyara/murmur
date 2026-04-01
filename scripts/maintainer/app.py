@@ -12,9 +12,8 @@ import os
 from datetime import UTC, datetime
 
 from flask import Flask, jsonify
-from google.cloud import iam_credentials_v1, secretmanager
-from google.cloud import iam_admin_v1
-from google.iam.v1 import iam_policy_pb2, policy_pb2
+from google.cloud import iam_admin_v1, iam_credentials_v1, secretmanager
+from google.iam.v1 import iam_policy_pb2
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
