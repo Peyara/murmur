@@ -120,7 +120,7 @@ def _inv_006(
     placeholders = ", ".join("?" for _ in secret_targets)
     # S608 false positive: placeholders are "?" literals, all values parameterized
     query = (
-        f"SELECT DISTINCT target_id FROM events "  # noqa: S608
+        f"SELECT DISTINCT target_id FROM events "  # noqa: S608  # nosec B608
         f"WHERE actor_id = ? AND action_type = ? "
         f"AND target_id IN ({placeholders}) "
         f"AND window_start >= ? AND window_start < ?"
@@ -171,7 +171,7 @@ def _inv_008(
     placeholders = ", ".join("?" for _ in kms_targets)
     # S608 false positive: placeholders are "?" literals, all values parameterized
     query = (
-        f"SELECT DISTINCT target_id FROM events "  # noqa: S608
+        f"SELECT DISTINCT target_id FROM events "  # noqa: S608  # nosec B608
         f"WHERE actor_id = ? AND action_type = ? "
         f"AND target_id IN ({placeholders}) "
         f"AND window_start >= ? AND window_start < ?"

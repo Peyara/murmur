@@ -85,7 +85,7 @@ def compute_fusion(
         "coverage_flag"
     )
     event_rows = db.execute(
-        f"SELECT {_EVENT_COLS} FROM events WHERE window_start = ? AND actor_id = ?",  # noqa: S608 — _EVENT_COLS is a constant
+        f"SELECT {_EVENT_COLS} FROM events WHERE window_start = ? AND actor_id = ?",  # noqa: S608  # nosec B608 — constant column list
         [window_start, actor_id],
     ).fetchall()
 
