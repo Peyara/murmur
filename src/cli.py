@@ -155,8 +155,12 @@ def score(db_path: str | None, window_start: str | None):
             fusion_raw = compute_fusion(conn, ws, actor_id, known)
             scores.append(fusion_raw)
 
-        high = sum(1 for s in scores if s >= SETTINGS.alert_high_threshold / 10)
-        med = sum(1 for s in scores if SETTINGS.alert_med_threshold / 10 <= s < SETTINGS.alert_high_threshold / 10)
+        # fusion_raw is [0, 1]; settings thresholds are on [0, 10] scale.
+        # Normalize thresholds to fusion scale for comparison.
+        high_t = SETTINGS.alert_high_threshold / 10.0
+        med_t = SETTINGS.alert_med_threshold / 10.0
+        high = sum(1 for s in scores if s >= high_t)
+        med = sum(1 for s in scores if med_t <= s < high_t)
         click.echo(
             f"Score complete: {len(scores)} (window, actor) pairs scored. "
             f"High: {high}, Medium: {med}"

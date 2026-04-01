@@ -60,7 +60,7 @@ def schnakenberg_entropy(
                 obs = obs_counts.get(pair_key, 0)
                 if obs < _COLD_THRESHOLD:
                     continue
-                weight = 0.5 if obs < _WARM_THRESHOLD else 1.0
+                weight = 0.5 if obs <= _WARM_THRESHOLD else 1.0
             else:
                 weight = 1.0
 

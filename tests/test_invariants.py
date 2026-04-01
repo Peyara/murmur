@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from src.ingest.dedup import insert_event
 from src.schema import ActionType, TargetZone
-from src.score.invariants import check_invariants, compute_inv_score, InvariantResult
+from src.score.invariants import InvariantResult, check_invariants, compute_inv_score
 from tests.conftest import make_event
 
 W1 = datetime(2026, 3, 28, 10, 0, 0)

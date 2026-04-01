@@ -1,11 +1,10 @@
 """Tests for scoring fusion layer."""
 
-import json
 from datetime import datetime, timedelta
 
 from src.ingest.dedup import insert_event
 from src.schema import ActionType, TargetZone
-from src.score.fusion import compute_fusion, normalize, FUSION_WEIGHTS, NORM_BOUNDS
+from src.score.fusion import FUSION_WEIGHTS, compute_fusion, normalize
 from tests.conftest import make_event
 
 W1 = datetime(2026, 3, 28, 10, 0, 0)

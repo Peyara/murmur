@@ -1,10 +1,8 @@
 """Tests for scoring novelty layer."""
 
-import json
 from datetime import datetime
 
 from src.score.novelty import compute_novelty_score, get_bridge_new
-
 
 W1 = datetime(2026, 3, 28, 10, 0, 0)
 

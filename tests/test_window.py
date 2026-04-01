@@ -9,7 +9,6 @@ from src.schema import ActionType, ProvenanceLevel, TargetZone
 from src.world.window import compute_actor_windows, compute_edges, shannon_entropy
 from tests.conftest import make_event
 
-
 # --- Helpers ---
 
 

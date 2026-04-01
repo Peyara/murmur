@@ -109,21 +109,31 @@ def _inv_006(
     events: list[CanonicalEvent],
 ) -> InvariantResult:
     """Secret accessed by actor who hasn't accessed this target in 30 days."""
-    for e in events:
-        if e.action_type == ActionType.SECRET_ACCESS.value:
-            lookback = window_start - timedelta(days=30)
-            row = db.execute(
-                "SELECT COUNT(*) FROM events "
-                "WHERE actor_id = ? AND action_type = ? AND target_id = ? "
-                "AND window_start >= ? AND window_start < ?",
-                [actor_id, ActionType.SECRET_ACCESS.value, e.target_id,
-                 lookback, window_start],
-            ).fetchone()
-            if row[0] == 0:
-                return InvariantResult(
-                    "INV_006", True, 5,
-                    f"New actor {actor_id} accessing secret {e.target_id}",
-                )
+    secret_targets = list({
+        e.target_id for e in events
+        if e.action_type == ActionType.SECRET_ACCESS.value
+    })
+    if not secret_targets:
+        return InvariantResult("INV_006", False, 0, "")
+
+    lookback = window_start - timedelta(days=30)
+    placeholders = ", ".join("?" for _ in secret_targets)
+    rows = db.execute(
+        f"SELECT DISTINCT target_id FROM events "
+        f"WHERE actor_id = ? AND action_type = ? "
+        f"AND target_id IN ({placeholders}) "
+        f"AND window_start >= ? AND window_start < ?",
+        [actor_id, ActionType.SECRET_ACCESS.value, *secret_targets,
+         lookback, window_start],
+    ).fetchall()
+    known_targets = {r[0] for r in rows}
+
+    for tid in secret_targets:
+        if tid not in known_targets:
+            return InvariantResult(
+                "INV_006", True, 5,
+                f"New actor {actor_id} accessing secret {tid}",
+            )
     return InvariantResult("INV_006", False, 0, "")
 
 
@@ -146,21 +156,31 @@ def _inv_008(
     events: list[CanonicalEvent],
 ) -> InvariantResult:
     """KMS decrypt by actor who hasn't decrypted this key in 30 days."""
-    for e in events:
-        if e.action_type == ActionType.KMS_DECRYPT.value:
-            lookback = window_start - timedelta(days=30)
-            row = db.execute(
-                "SELECT COUNT(*) FROM events "
-                "WHERE actor_id = ? AND action_type = ? AND target_id = ? "
-                "AND window_start >= ? AND window_start < ?",
-                [actor_id, ActionType.KMS_DECRYPT.value, e.target_id,
-                 lookback, window_start],
-            ).fetchone()
-            if row[0] == 0:
-                return InvariantResult(
-                    "INV_008", True, 4,
-                    f"New actor {actor_id} decrypting {e.target_id}",
-                )
+    kms_targets = list({
+        e.target_id for e in events
+        if e.action_type == ActionType.KMS_DECRYPT.value
+    })
+    if not kms_targets:
+        return InvariantResult("INV_008", False, 0, "")
+
+    lookback = window_start - timedelta(days=30)
+    placeholders = ", ".join("?" for _ in kms_targets)
+    rows = db.execute(
+        f"SELECT DISTINCT target_id FROM events "
+        f"WHERE actor_id = ? AND action_type = ? "
+        f"AND target_id IN ({placeholders}) "
+        f"AND window_start >= ? AND window_start < ?",
+        [actor_id, ActionType.KMS_DECRYPT.value, *kms_targets,
+         lookback, window_start],
+    ).fetchall()
+    known_targets = {r[0] for r in rows}
+
+    for tid in kms_targets:
+        if tid not in known_targets:
+            return InvariantResult(
+                "INV_008", True, 4,
+                f"New actor {actor_id} decrypting {tid}",
+            )
     return InvariantResult("INV_008", False, 0, "")
 
 

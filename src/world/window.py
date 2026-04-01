@@ -12,7 +12,6 @@ from itertools import groupby
 
 import duckdb
 
-
 _PROVENANCE_RANK = {"NONE": 0, "WEAK": 1, "STRONG": 2}
 _PROVENANCE_BY_RANK = {v: k for k, v in _PROVENANCE_RANK.items()}
 

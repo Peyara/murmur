@@ -1,10 +1,8 @@
 """Tests for scoring physics layer (delta_F, EMA)."""
 
-import json
 from datetime import datetime, timedelta
 
 from src.score.physics import compute_delta_f
-
 
 W1 = datetime(2026, 3, 28, 10, 0, 0)
 

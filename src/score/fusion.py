@@ -12,7 +12,7 @@ import duckdb
 
 from src.schema import CanonicalEvent
 from src.score.invariants import check_invariants, compute_inv_score
-from src.score.novelty import compute_novelty_score, get_bridge_new
+from src.score.novelty import compute_novelty_score
 from src.score.physics import compute_delta_f
 
 # Initial weights (calibrate in Sprint 1B)
@@ -74,20 +74,22 @@ def compute_fusion(
     bridge_new = zf_row[1] if zf_row else 0
 
     # Get events for invariant checks
-    event_rows = db.execute(
-        "SELECT event_id, ts, window_start, actor_id, actor_type, "
+    # Column order must match CanonicalEvent.__init__ signature exactly.
+    # If CanonicalEvent fields change, update this query to match.
+    _EVENT_COLS = (
+        "event_id, ts, window_start, actor_id, actor_type, "
         "action_type, target_id, target_type, target_zone, result, "
         "trigger_ref, provenance_level, provenance_source, "
         "correlation_confidence, delegation_chain, project_id, env, "
         "is_deploy, is_incident, is_infrastructure, risk_tags, raw_ref, "
-        "coverage_flag "
-        "FROM events WHERE window_start = ? AND actor_id = ?",
+        "coverage_flag"
+    )
+    event_rows = db.execute(
+        f"SELECT {_EVENT_COLS} FROM events WHERE window_start = ? AND actor_id = ?",
         [window_start, actor_id],
     ).fetchall()
 
-    events = [
-        CanonicalEvent(*row) for row in event_rows
-    ]
+    events = [CanonicalEvent(*row) for row in event_rows]
 
     # Invariants
     inv_results = check_invariants(db, window_start, actor_id, events, known_initiators)
