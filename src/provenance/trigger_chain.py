@@ -29,7 +29,10 @@ def _resolve_scheduler_trigger(
     Scheduler SAs follow the pattern:
       service-{PROJECT_NUMBER}@gcp-sa-cloudscheduler.iam.gserviceaccount.com
 
-    We check if any known_initiator matches a scheduler SA pattern.
+    ASSUMPTION: Single-project deployment. Checks if ANY known_initiator has
+    a scheduler SA suffix, without verifying the SA matches the trigger_ref's
+    specific job. In multi-project setups, tighten this to parse the job_id
+    from trigger_ref and look up the actual executing SA from scheduler logs.
     """
     for initiator in known_initiators:
         if initiator.endswith("@gcp-sa-cloudscheduler.iam.gserviceaccount.com"):

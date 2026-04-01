@@ -11,7 +11,7 @@ from datetime import datetime
 import duckdb
 
 from config.settings import MurmurSettings
-from src.provenance.patterns import compute_pattern_match
+from src.provenance.patterns import compute_pattern_match, record_pattern_match
 from src.provenance.trigger_chain import resolve_trigger_chain
 
 # Boosted multiplier for WEAK provenance when trigger chain resolves
@@ -25,6 +25,7 @@ def compute_residual_risk(
     fusion_raw: float,
     known_initiators: set[str],
     settings: MurmurSettings,
+    cached_patterns: list[dict] | None = None,
 ) -> float:
     """Compute residual_risk by applying provenance discount to fusion_raw.
 
@@ -50,10 +51,15 @@ def compute_residual_risk(
     zone_sequence = json.loads(aw_row[0]) if aw_row[0] else []
     event_count = aw_row[1] or 0
 
-    # Pattern matching
+    # Pattern matching (use cached_patterns to avoid N queries per scoring run)
     match_score, matched_pattern_id = compute_pattern_match(
         db, window_start, actor_id, zone_sequence, event_count, window_start,
+        cached_patterns=cached_patterns,
     )
+
+    # Record match idempotently (once per window per pattern)
+    if matched_pattern_id and match_score > 0:
+        record_pattern_match(db, matched_pattern_id, window_start)
 
     # Get dominant provenance_level and trigger_ref for this actor's events
     prov_row = db.execute(

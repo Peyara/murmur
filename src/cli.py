@@ -140,6 +140,7 @@ def score(db_path: str | None, window_start: str | None):
     """Compute risk scores for all (window, actor) pairs."""
     from datetime import datetime
 
+    from src.provenance.patterns import list_patterns
     from src.provenance.residual import compute_residual_risk
     from src.score.fusion import compute_fusion
 
@@ -147,6 +148,7 @@ def score(db_path: str | None, window_start: str | None):
     conn = duckdb.connect(db_path)
     try:
         known = SETTINGS.load_known_initiators()
+        cached_patterns = list_patterns(conn, include_inactive=False)
 
         if window_start:
             pairs = conn.execute(
@@ -161,7 +163,8 @@ def score(db_path: str | None, window_start: str | None):
         scores = []
         for ws, actor_id in pairs:
             fusion_raw = compute_fusion(conn, ws, actor_id, known)
-            compute_residual_risk(conn, ws, actor_id, fusion_raw, known, SETTINGS)
+            compute_residual_risk(conn, ws, actor_id, fusion_raw, known, SETTINGS,
+                                  cached_patterns=cached_patterns)
             scores.append(fusion_raw)
 
         # fusion_raw is [0, 1]; settings thresholds are on [0, 10] scale.

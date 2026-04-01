@@ -72,13 +72,15 @@ def deactivate_pattern(db: duckdb.DuckDBPyConnection, pattern_id: str) -> bool:
 
 
 def _match_actor(actor_id: str, expected_actors: list[str]) -> float:
-    """Match actor against expected actors. Exact=1.0, prefix=0.8, none=0.0."""
+    """Match actor against expected actors. Exact=1.0, same local-part=0.8, none=0.0."""
     if not expected_actors:
         return 1.0  # no constraint
+    actor_local = actor_id.split("@")[0] if "@" in actor_id else actor_id
     for expected in expected_actors:
         if actor_id == expected:
             return 1.0
-        if actor_id.startswith(expected.split("@")[0]):
+        expected_local = expected.split("@")[0] if "@" in expected else expected
+        if actor_local == expected_local:
             return 0.8
     return 0.0
 
@@ -143,13 +145,15 @@ def compute_pattern_match(
     zone_sequence: list[str],
     event_count: int,
     window_ts: datetime,
+    cached_patterns: list[dict] | None = None,
 ) -> tuple[float, str | None]:
     """Compute best pattern match score for an actor's window activity.
 
+    Pass cached_patterns to avoid re-querying on every call during batch scoring.
     Returns (pattern_match_score, matched_pattern_id). If no active patterns
     match, returns (0.0, None).
     """
-    patterns = list_patterns(db, include_inactive=False)
+    patterns = cached_patterns if cached_patterns is not None else list_patterns(db, include_inactive=False)
     if not patterns:
         return 0.0, None
 
@@ -181,12 +185,27 @@ def compute_pattern_match(
             best_score = composite
             best_id = p["pattern_id"]
 
-    # Update match count and last_matched_ts for the winning pattern
-    if best_id and best_score > 0:
-        db.execute(
-            "UPDATE sanctioned_patterns SET match_count = match_count + 1, "
-            "last_matched_ts = ? WHERE pattern_id = ?",
-            [datetime.now(), best_id],
-        )
-
     return best_score, best_id
+
+
+def record_pattern_match(
+    db: duckdb.DuckDBPyConnection,
+    pattern_id: str,
+    window_start: datetime,
+) -> None:
+    """Record a pattern match — idempotent per (pattern, window).
+
+    Uses window_start to deduplicate: only increments match_count once
+    per window even if called multiple times for the same window.
+    """
+    current = db.execute(
+        "SELECT last_matched_ts FROM sanctioned_patterns WHERE pattern_id = ?",
+        [pattern_id],
+    ).fetchone()
+    if current and current[0] == window_start:
+        return  # already recorded for this window
+    db.execute(
+        "UPDATE sanctioned_patterns SET match_count = match_count + 1, "
+        "last_matched_ts = ? WHERE pattern_id = ?",
+        [window_start, pattern_id],
+    )
