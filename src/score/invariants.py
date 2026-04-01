@@ -118,11 +118,15 @@ def _inv_006(
 
     lookback = window_start - timedelta(days=30)
     placeholders = ", ".join("?" for _ in secret_targets)
-    rows = db.execute(
-        f"SELECT DISTINCT target_id FROM events "
+    # S608 false positive: placeholders are "?" literals, all values parameterized
+    query = (
+        f"SELECT DISTINCT target_id FROM events "  # noqa: S608
         f"WHERE actor_id = ? AND action_type = ? "
         f"AND target_id IN ({placeholders}) "
-        f"AND window_start >= ? AND window_start < ?",
+        f"AND window_start >= ? AND window_start < ?"
+    )
+    rows = db.execute(
+        query,
         [actor_id, ActionType.SECRET_ACCESS.value, *secret_targets,
          lookback, window_start],
     ).fetchall()
@@ -165,11 +169,15 @@ def _inv_008(
 
     lookback = window_start - timedelta(days=30)
     placeholders = ", ".join("?" for _ in kms_targets)
-    rows = db.execute(
-        f"SELECT DISTINCT target_id FROM events "
+    # S608 false positive: placeholders are "?" literals, all values parameterized
+    query = (
+        f"SELECT DISTINCT target_id FROM events "  # noqa: S608
         f"WHERE actor_id = ? AND action_type = ? "
         f"AND target_id IN ({placeholders}) "
-        f"AND window_start >= ? AND window_start < ?",
+        f"AND window_start >= ? AND window_start < ?"
+    )
+    rows = db.execute(
+        query,
         [actor_id, ActionType.KMS_DECRYPT.value, *kms_targets,
          lookback, window_start],
     ).fetchall()
