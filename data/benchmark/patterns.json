@@ -1,0 +1,22 @@
+[
+  {
+    "name": "normal-worker-scheduled",
+    "description": "Scheduled normal-worker: reads config/data, accesses secret, writes output",
+    "initiator_type": "SCHEDULED",
+    "expected_actors": ["normal-worker-sa@murmur-sandbox.iam.gserviceaccount.com"],
+    "expected_zones": ["DATA", "DATA", "SECRET", "DATA"],
+    "rate_min": 3,
+    "rate_max": 10,
+    "expected_duration": 15
+  },
+  {
+    "name": "maintainer-scheduled",
+    "description": "Scheduled maintainer: creates/rotates/reads secrets",
+    "initiator_type": "SCHEDULED",
+    "expected_actors": ["maintenance-sa@murmur-sandbox.iam.gserviceaccount.com"],
+    "expected_zones": ["SECRET", "SECRET", "SECRET"],
+    "rate_min": 2,
+    "rate_max": 8,
+    "expected_duration": 15
+  }
+]
