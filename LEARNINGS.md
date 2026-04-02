@@ -6,6 +6,93 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-01 — R&D — Session F: Data refresh, provenance validation, R&D review
+
+**Session Summary**
+- Mode: R&D, local
+- Refreshed data from GCS sandbox (now through 2026-04-01 19:55 UTC). 11,286 events, 630 windows, 916 scored pairs.
+- Separated Murmur CLAUDE.md into project-specific only (v2.0) — global standards inherited from Peyara/CLAUDE.md.
+- Fixed maintenance-sa correlation: added `"maintainer"` to `service_worker_map` in config/settings.py.
+- Validated provenance discount: normal-worker-sa 17%, maintenance-sa 20.7%. WATCH alerts dropped 119 → 10.
+- Full R&D review: signal contribution, false positive analysis, invariant blind spots, score separation projections.
+- Sandbox diversification deployed: KMS encrypt in normal-worker (rev 4), VM label update in maintainer (rev 4), EXFIL_RISK bucket, INV_011 (delegation chain anomaly). 355 tests green.
+- Added KMS_ENCRYPT action type + Encrypt/setLabels parser mappings.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Add maintainer to service_worker_map (hardcoded) | Auto-discover from logs; NONE discount path | Auto-discover is the product path but needs hydration write-back loop (not built). NONE discount papers over missing correlation. Hardcoded is correct for Sprint 1. |
+| Separate Murmur CLAUDE.md from Peyara global | Single file with everything; symlink | Claude Code reads hierarchy automatically. Separation avoids drift and keeps project file focused. |
+| INV_011: delegation chain anomaly | Add as physics signal; defer to Sprint 2 | Strongest uncaptured blind spot. Invariant is simpler and testable now. Physics signal needs more design. |
+| Sandbox: Tier 1+2 now, Tier 3 deferred | Do all tiers; skip diversification | Tier 1+2 are fast and high demo value. Tier 3 needs architectural changes (cross-actor) or more baseline data. |
+| Weight rebalancing: defer to Sprint 1B | Rebalance now; keep current | Need attack data to evaluate rebalancing. Current weights are safe (low FP). |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| Provenance discount 0% on fresh DB — no patterns registered | Cold-start produces no discount regardless of correlation quality | Expected behavior. Documents that patterns must be registered (or auto-discovered) for discount to apply. |
+| maintenance-sa fires INV_004 (impersonation) 100% of windows | 114 false WATCH alerts dominate the alert tier | Fixed by adding to service_worker_map → 20.7% discount → 109/114 drop to NORMAL |
+| All 7 MEDIUM alerts are from first 4 days (March 24-28) | After hydration, system is stable — no new edges, no novel actors | Validates hydration model: ~4 days to baseline for this sandbox |
+| Score distribution: p50=0.058, p90=0.31, max=0.75 | Clear separation between normal and anomalous. Gap between p99 (0.36) and max (0.75) is where attack signals would live | Good baseline for benchmark — attack injection should push above 0.75 |
+| service_worker_map is hardcoded — doesn't generalize | Every new GCP environment needs manual config | **Design decision: hydration should auto-discover mappings + propose sanctioned patterns. Machinery exists (validate_service_worker_map), write-back loop doesn't. Product roadmap item.** |
+
+**Design Decision: Auto-Discovery (Product Roadmap)**
+
+The current `service_worker_map` and `register-pattern` are manual, per-environment config. For Murmur to generalize:
+
+1. **Hydration auto-discovers service_worker_map.** `validate_service_worker_map()` already observes (service_name → most_common_SA). It should write back discovered mappings, not just validate hardcoded ones. Config becomes optional override/pre-seed.
+2. **Hydration proposes sanctioned patterns.** Observe recurring (scheduler_job → service → SA → zone_sequence) chains during hydration. Propose as candidate patterns for human approval.
+3. **Pattern lifecycle: discovered → proposed → approved → active.** Human-in-the-loop for approval, but discovery is automatic.
+
+This is the self-learning architecture from the Hydration design — observation machinery exists, inference-to-config loop doesn't. Sprint 1 hardcoding is correct first pass; auto-discovery is Sprint 3+ or product-readiness work.
+
+**R&D Review Findings**
+
+Signal contribution:
+- inv_score dominates fusion (0.94 correlation, 47-70% of every MEDIUM alert). Physics signals contribute but can't independently reach MEDIUM.
+- burst_per_min is dead weight (1.1x separation, 0.06 correlation). breadth_entropy is anti-correlated (-0.37) — higher entropy = less risky in this environment.
+- novelty_score and bridge_new are the sharpest discriminators (750x, 132x MEDIUM/NORMAL) but only fire during hydration period.
+- Decision: rebalance weights in Sprint 1B to give physics signals more influence. Not a separate detection mode — single fusion score.
+
+False positives:
+- 1 clear FP (service-agent-manager INV_001). 4 residual maintenance-sa WATCH (INV_004). 2 borderline GCP-internal.
+- All 6 MEDIUM alerts are true positives on setup/first-time activity. Zero false alerts on steady-state benign activity.
+
+Invariant blind spots:
+- 3 invariants never fired: INV_003 (novel key creator), INV_008 (KMS), INV_009 (compute metadata). Lack of sandbox diversity.
+- EXFIL_RISK zone: 0 events. Completely dark.
+- Strongest uncaptured signal: delegation chain anomaly (67% of events have chains — absence on a chained SA = stolen credential).
+- Other gaps: cross-actor patterns, data volume anomaly, temporal anomaly (deferred).
+
+Score separation:
+- Benign max: 0.75. S04 attack projection: 0.79. Stealth (no invariant): 0.23 (invisible).
+- System is structurally invariant-dependent. Without inv_score, ceiling is 0.65.
+- Attacker with NO provenance gets no discount (good). Stolen credential with partial pattern match gets ~9% discount (acceptable).
+
+**Sandbox Diversification Deployed**
+- normal-worker rev 4: KMS Encrypt on every invocation (every 5 min). First KMS audit event confirmed at 2026-04-02 01:50 UTC.
+- maintainer rev 4: VM label update (`last-maintenance`) on every invocation (hourly). First invocation pending (02:00 UTC).
+- EXFIL_RISK bucket: `gs://public-export-sandbox` created. Empty — used only for attack injection.
+- INV_011: delegation chain anomaly. Fires when SA with >80% historical delegation chain acts without one. 5 tests.
+- KMS_ENCRYPT action type + Encrypt/setLabels parser mappings added.
+- Incremental cost: ~$0.06/month (KMS key storage). Everything else free tier.
+
+**CLAUDE.md Evolution Candidates**
+- "Data refresh + re-score as first session step" → user confirmed as standard practice. Add to session start checklist.
+- "Cold-start behavior must be explicitly designed, not assumed from steady-state" → promote to Design Philosophy.
+- "A detection layer that can't observe its target is invisible" → restatement of "observe before hypothesize" at the system level.
+
+**Open Questions**
+1. 1,127 parse errors on ingest — what are they? (Likely stderr/varlog/system_event files that don't match audit format)
+2. Maintenance-sa spike window (2026-03-28 03:30) still MEDIUM after discount — is that the SA key creation event? Expected one-time setup activity?
+3. service-agent-manager false positive (INV_001) still present — needs known_initiators allow-list (parked for Sprint 1B)
+4. Verify maintainer rev 4 VM label audit events flowing after 02:00 UTC trigger
+5. After ~3h of KMS data: register updated sanctioned patterns for normal-worker (add SECRET→SECRET KMS zone)
+
+---
+
 ### 2026-03-31 — Production — Session E: Provenance scaffold + multi-format ingest fix
 
 **Session Summary**
