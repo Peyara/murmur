@@ -1,119 +1,6 @@
-# CLAUDE.md — Global Coding Identity
+# CLAUDE.md — Murmur Project
 
-> Read fully at session start. Living document — propose updates when patterns emerge.
-
----
-
-## Who I Am
-
-I own large AI/ML engineering lifecycles. Every design choice has downstream consequences — for systems, for teams, for production.
-
-My edge is first-principles systems thinking: reasoning from the ground up, whole before parts. The output is a clear intuition for **necessary and sufficient** — the shortest quality path to each checkpoint, no more.
-
----
-
-## 🚨 Safety — High-Privilege Actions
-
-STOP. Display this block and wait for explicit "yes". Do NOT assume consent. Do NOT proceed on ambiguous input.
-
-```
-🚨 HIGH PRIVILEGE ACTION — Sign-off required
-Action: [what]
-Risk: [what could go wrong]
-Reversible: [yes/no — how]
-Proceed? (yes / no / modify)
-```
-
-**Triggers — NEVER execute without sign-off:**
-- `rm`, `rmdir`, `rm -rf`, or any destructive file/directory op
-- Any model checkpoint, dataset, or experiment artifact (`.pkl`, `.parquet`, `.pt`, `.csv`, etc.)
-- DB migrations, `DROP`, `TRUNCATE`, or schema changes
-- Writes to production config, secrets, or env vars
-- `git commit`, `push`, `merge`, or PR creation
-- IAM/permission changes or infrastructure modifications
-- System-level installs (`apt`, `brew`, `uv` globally — NEVER `pip`; `uv` only)
-- Files outside current task's directory scope
-- Command retry with `sudo` or `--force` after failure — report the error instead
-- Data-mutating ops against any dataset without confirming non-production
-
-**ML-specific:** NEVER modify a random seed, data split, or default model parameter without flagging as a reproducibility-affecting change requiring sign-off.
-
-**Secrets & credentials — NEVER commit to the repo:**
-- `.env` files with real values (only `.env.example` with placeholders)
-- GCP service account key files (`*-credentials.json`, `*-key.json`)
-- Real GCP project IDs, service account emails, or resource URLs in source code (use env vars via `config/settings.py`)
-- Private keys, API tokens, or any credential material
-- If in doubt, check `.gitignore` and run `gitleaks detect` before committing
-
-**At session start:** confirm active environment (local / staging / production) before any write op.
-
----
-
-## Collaboration Model
-
-Equal collaborators. I bring systems intuition, domain context, and design accountability. You bring breadth, pattern recognition, and execution speed.
-
-- **Run autonomously** within agreed task scope
-- **Stop and surface** before: architectural choices, new dependencies, 3rd-party API calls, schema changes, data deletions, or anything not undoable with a single `git revert`
-- If you spot a bug, missing test, leaking abstraction, or contradiction with this file — say so once, clearly, before continuing
-- No sycophancy. If my approach is suboptimal, say so with a better alternative. One sentence per tradeoff. Best outcomes over agreement.
-- **At session start:** gauge intent, then explicitly ask: *"Are we in Production or R&D mode?"* Do not proceed until confirmed. If in /plan mode, make sure to think aloud as much as possible, and brainstorm with me. We are equal collaborators here. DO not keep thinking on your own and updating plans without discussing with me.
-
----
-
-## Core Design Philosophy
-
-> "Necessary and sufficient." Filter for every decision.
-
-Every choice must pass: *can I state in one sentence why this beats the obvious alternative?* If not, more thought needed.
-
-**Hard rejections:** unnecessary abstractions, new dependencies when existing ones suffice, frameworks before stdlib, skipping tests to move faster.
-
-Before creating any new module, class, or interface: search the codebase for an existing implementation first. Extend before creating.
-
----
-
-## Mode: Production / Implementation
-
-*Default if genuinely ambiguous after asking.*
-
-**Session workflow — ALWAYS:**
-1. **Plan first.** Scope, approach, decisions, alternatives rejected. Challenge the premise, identify system-level consequences, flag what breaks at scale or in 6 months, surface what the plan hasn't considered. Wait for explicit approval.
-2. **One feature per session.** Plan → scope → tests → implement. Never bundle features.
-3. **Tests before code.** Ring-fence the implementation, cover all failure modes. Wait for sign-off before writing feature code.
-4. If I skip plan mode — stop and prompt me to enter it.
-
-| | Standard |
-|---|---|
-| **Tests** | TDD — ALWAYS written first. Missing tests are a blocker. |
-| **Dependencies** | Justify before adding; flag API cost + rate limits + failure behavior |
-| **Code quality** | Layered: business logic in product layer, ML logic in ML layer; config-driven; normalize before creating new |
-| **Commits** | Atomic, meaningful messages |
-| **Docs** | Setup, architecture decisions, non-obvious constraints and tradeoffs |
-
-**Code style:** readable over clever; self-documenting names; comments explain *why*; no dead code in commits.
-
-**➡ Project-level CLAUDE.md must define:** layer names, directory paths, one concrete example of correct vs. incorrect layering.
-
----
-
-## Mode: Science / R&D
-
-*Intellectual range over discipline. Constraints relax; rigor doesn't.*
-
-- Challenge the premise before accepting it. If a better-posed problem exists, name it.
-- Surface relevant theory, prior work, and alternative frameworks — even if not asked.
-- Flag known weaknesses in my approach or stronger theoretical alternatives directly.
-- Distinguish: well-established theory / current best practice / open or contested questions.
-- Note assumptions, parameter sensitivities, and what would change the conclusion.
-
-| | Standard |
-|---|---|
-| **Tests** | Scratch tests for validation; document what held and what broke |
-| **Dependencies** | Try freely; note what worked and why |
-| **Code quality** | Readable and runnable; no production patterns required |
-| **Commits** | Not required |
-| **Docs** | Findings, assumptions, open questions, what to harden before production |
+> Project-specific context. Global standards inherited from `Peyara/CLAUDE.md`.
 
 ---
 
@@ -196,12 +83,13 @@ The goal: anyone reading the sprint doc can see exactly where we are, what we've
 
 ---
 
-## Evolving This File
+## Secrets & Credentials
 
-At session end, flag: any standard violated (and why), any pattern worth codifying, any instruction that caused friction. Propose the edit directly.
-
-**At every session end:** run `/session-end`.
+- `.env` files with real values: NEVER commit (only `.env.example` with placeholders)
+- GCP service account key files (`*-credentials.json`, `*-key.json`): NEVER commit
+- Real GCP project IDs, service account emails, or resource URLs in source code: use env vars via `config/settings.py`
+- If in doubt, check `.gitignore` and run `gitleaks detect` before committing
 
 ---
 
-*Last updated: [date] — v1.0*
+*Last updated: 2026-04-01 — v2.0*

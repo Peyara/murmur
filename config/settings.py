@@ -63,7 +63,10 @@ class MurmurSettings:
     # --- Correlation (Sprint 1) ---
     # Maps Cloud Run service_name → expected worker SA email (requires GCP_PROJECT_ID)
     service_worker_map: dict[str, str] = field(default_factory=lambda: (
-        {"normal-worker": f"normal-worker-sa@{pid}.iam.gserviceaccount.com"}
+        {
+            "normal-worker": f"normal-worker-sa@{pid}.iam.gserviceaccount.com",
+            "maintainer": f"maintenance-sa@{pid}.iam.gserviceaccount.com",
+        }
         if (pid := os.environ.get("GCP_PROJECT_ID"))
         else {}
     ))

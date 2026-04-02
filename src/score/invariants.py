@@ -1,6 +1,6 @@
 """Scoring invariants layer.
 
-10 invariants (INV_001-INV_010) that detect suspicious patterns in
+11 invariants (INV_001-INV_011) that detect suspicious patterns in
 audit log events within a 15-min window. Each invariant is a pure
 function returning an InvariantResult.
 """
@@ -223,6 +223,63 @@ def _inv_010(
     return InvariantResult("INV_010", False, 0, "")
 
 
+def _inv_011(
+    db: duckdb.DuckDBPyConnection,
+    window_start: datetime,
+    actor_id: str,
+    events: list[CanonicalEvent],
+) -> InvariantResult:
+    """SA acting without expected delegation chain.
+
+    If an SA historically acts through a delegation chain (>80% of events in
+    the past 30 days have a non-empty chain), but events in this window lack
+    a chain, this suggests the credential was used directly — possible theft.
+    """
+    # Only applies to service accounts (contain "@" and ".iam.gserviceaccount.com")
+    if ".iam.gserviceaccount.com" not in actor_id:
+        return InvariantResult("INV_011", False, 0, "")
+
+    # Check current window: any events without delegation chain?
+    unchained = [
+        e for e in events
+        if e.delegation_chain in ("[]", "", None)
+    ]
+    if not unchained:
+        return InvariantResult("INV_011", False, 0, "")
+
+    # 30-day lookback: what fraction of this actor's events have delegation chains?
+    lookback = window_start - timedelta(days=30)
+    row = db.execute(
+        "SELECT "
+        "  COUNT(*) FILTER (WHERE delegation_chain IS NOT NULL "
+        "    AND delegation_chain != '[]' AND LENGTH(delegation_chain) > 2), "
+        "  COUNT(*) "
+        "FROM events "
+        "WHERE actor_id = ? AND window_start >= ? AND window_start < ?",
+        [actor_id, lookback, window_start],
+    ).fetchone()
+
+    chained_count = row[0] if row and row[0] else 0
+    total_count = row[1] if row and row[1] else 0
+
+    if total_count < 10:
+        # Not enough history to establish baseline
+        return InvariantResult("INV_011", False, 0, "")
+
+    chain_ratio = chained_count / total_count
+    if chain_ratio < 0.8:
+        # This actor doesn't consistently use delegation chains — not anomalous
+        return InvariantResult("INV_011", False, 0, "")
+
+    # Actor normally uses delegation but these events don't have it
+    return InvariantResult(
+        "INV_011", True, 5,
+        f"SA {actor_id} normally acts via delegation chain "
+        f"({chained_count}/{total_count}={chain_ratio:.0%} historical) "
+        f"but {len(unchained)} events in this window lack delegation",
+    )
+
+
 def check_invariants(
     db: duckdb.DuckDBPyConnection,
     window_start: datetime,
@@ -230,7 +287,7 @@ def check_invariants(
     events: list[CanonicalEvent],
     known_initiators: set[str],
 ) -> list[InvariantResult]:
-    """Run all 10 invariants for a (window, actor) pair."""
+    """Run all 11 invariants for a (window, actor) pair."""
     return [
         _inv_001(events),
         _inv_002(events),
@@ -242,6 +299,7 @@ def check_invariants(
         _inv_008(db, window_start, actor_id, events),
         _inv_009(events),
         _inv_010(db, window_start, actor_id),
+        _inv_011(db, window_start, actor_id, events),
     ]
 
 

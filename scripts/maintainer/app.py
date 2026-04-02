@@ -12,7 +12,7 @@ import os
 from datetime import UTC, datetime
 
 from flask import Flask, jsonify
-from google.cloud import iam_admin_v1, iam_credentials_v1, secretmanager
+from google.cloud import compute_v1, iam_admin_v1, iam_credentials_v1, secretmanager
 from google.iam.v1 import iam_policy_pb2
 
 app = Flask(__name__)
@@ -29,9 +29,14 @@ MAINTENANCE_SA_EMAIL = os.environ.get(
 TOGGLE_ROLE = "roles/iam.serviceAccountUser"
 TOGGLE_MEMBER = f"serviceAccount:{MAINTENANCE_SA_EMAIL}"
 
+# VM for metadata update (COMPUTE zone)
+VM_NAME = os.environ.get("VM_NAME", "murmur-vm")
+VM_ZONE = os.environ.get("GCP_ZONE", "us-central1-a")
+
 _sm_client: secretmanager.SecretManagerServiceClient | None = None
 _iam_client: iam_admin_v1.IAMClient | None = None
 _cred_client: iam_credentials_v1.IAMCredentialsClient | None = None
+_compute_client: compute_v1.InstancesClient | None = None
 
 
 def _get_secret_client() -> secretmanager.SecretManagerServiceClient:
@@ -53,6 +58,13 @@ def _get_credentials_client() -> iam_credentials_v1.IAMCredentialsClient:
     if _cred_client is None:
         _cred_client = iam_credentials_v1.IAMCredentialsClient()
     return _cred_client
+
+
+def _get_compute_client() -> compute_v1.InstancesClient:
+    global _compute_client  # noqa: PLW0603
+    if _compute_client is None:
+        _compute_client = compute_v1.InstancesClient()
+    return _compute_client
 
 
 def _rotate_secret() -> str:
@@ -117,9 +129,34 @@ def _toggle_iam_binding() -> str:
     return "toggled"
 
 
+def _update_vm_label() -> str:
+    """Update a VM label (COMPUTE zone: setLabels → compute metadata audit event)."""
+    client = _get_compute_client()
+    now = datetime.now(UTC)
+
+    instance = client.get(project=PROJECT_ID, zone=VM_ZONE, instance=VM_NAME)
+
+    # Update the maintenance timestamp label
+    labels = dict(instance.labels) if instance.labels else {}
+    labels["last-maintenance"] = now.strftime("%Y%m%dt%H%M")
+
+    label_fingerprint = instance.label_fingerprint
+    request = compute_v1.SetLabelsInstanceRequest(
+        project=PROJECT_ID,
+        zone=VM_ZONE,
+        instance=VM_NAME,
+        instances_set_labels_request_resource=compute_v1.InstancesSetLabelsRequest(
+            labels=labels,
+            label_fingerprint=label_fingerprint,
+        ),
+    )
+    client.set_labels(request=request)
+    return f"label updated: last-maintenance={labels['last-maintenance']}"
+
+
 @app.route("/maintain")
 def maintain():
-    """Run hourly maintenance cycle: secret rotation + key cycle + IAM toggle."""
+    """Run hourly maintenance cycle: secret rotation + token gen + IAM toggle + VM label."""
     now = datetime.now(UTC)
     results = {}
 
@@ -132,6 +169,14 @@ def maintain():
 
         # 3. CONTROL zone: SetIamPolicy (add) + SetIamPolicy (remove)
         results["iam_toggled"] = _toggle_iam_binding()
+
+        # 4. COMPUTE zone: VM label update (setLabels → compute metadata change)
+        try:
+            results["vm_label"] = _update_vm_label()
+        except Exception as e:
+            # Non-fatal — VM may not exist in all environments
+            logger.warning("VM label update failed (non-fatal): %s", e)
+            results["vm_label"] = f"skipped: {e}"
 
         results["status"] = "ok"
         results["ts"] = now.isoformat()

@@ -304,6 +304,93 @@ class TestINV010:
         assert r.fired is False
 
 
+# --- INV_011: SA acting without delegation chain ---
+
+
+class TestINV011:
+    def _seed_history(self, db, actor_id, chained_count, unchained_count):
+        """Insert historical events with/without delegation chains."""
+        base = W1 - timedelta(days=7)
+        for i in range(chained_count):
+            e = make_event(
+                event_id=f"hist-chain-{i}",
+                ts=base + timedelta(hours=i),
+                window_start=base + timedelta(hours=i),
+                actor_id=actor_id,
+                action_type=ActionType.SECRET_ACCESS,
+                delegation_chain='["robot-prod@proj.iam.gserviceaccount.com"]',
+            )
+            insert_event(db, e)
+        for i in range(unchained_count):
+            e = make_event(
+                event_id=f"hist-nochain-{i}",
+                ts=base + timedelta(hours=chained_count + i),
+                window_start=base + timedelta(hours=chained_count + i),
+                actor_id=actor_id,
+                delegation_chain="[]",
+                action_type=ActionType.SECRET_ACCESS,
+            )
+            insert_event(db, e)
+
+    def test_fires_sa_without_chain_when_historical(self, db):
+        """SA with 90% historical delegation acts without chain → fire."""
+        actor = "worker-sa@proj.iam.gserviceaccount.com"
+        self._seed_history(db, actor, chained_count=18, unchained_count=2)
+        events = _make_events(db, [
+            {"actor_id": actor, "action_type": ActionType.SECRET_ACCESS,
+             "target_zone": TargetZone.SECRET},
+        ])
+        # Current events have no delegation_chain (default is "[]")
+        r = _find(_check(db, events, actor_id=actor), "INV_011")
+        assert r.fired is True
+        assert r.severity == 5
+        assert "delegation chain" in r.explanation
+
+    def test_silent_when_chain_present(self, db):
+        """SA with delegation chain in current window → silent."""
+        actor = "worker-sa@proj.iam.gserviceaccount.com"
+        self._seed_history(db, actor, chained_count=18, unchained_count=2)
+        e = make_event(
+            event_id="current-chained",
+            ts=W1 + timedelta(minutes=1),
+            window_start=W1,
+            actor_id=actor,
+            action_type=ActionType.SECRET_ACCESS,
+            delegation_chain='["robot-prod@proj.iam.gserviceaccount.com"]',
+        )
+        insert_event(db, e)
+        r = _find(_check(db, [e], actor_id=actor), "INV_011")
+        assert r.fired is False
+
+    def test_silent_for_human_actor(self, db):
+        """Human actors (not .iam.gserviceaccount.com) → always silent."""
+        events = _make_events(db, [
+            {"actor_id": "admin@company.com", "action_type": ActionType.IAM_SET_POLICY},
+        ])
+        r = _find(_check(db, events, actor_id="admin@company.com"), "INV_011")
+        assert r.fired is False
+
+    def test_silent_insufficient_history(self, db):
+        """SA with <10 historical events → silent (not enough to baseline)."""
+        actor = "new-sa@proj.iam.gserviceaccount.com"
+        self._seed_history(db, actor, chained_count=5, unchained_count=0)
+        events = _make_events(db, [
+            {"actor_id": actor, "action_type": ActionType.SECRET_ACCESS},
+        ])
+        r = _find(_check(db, events, actor_id=actor), "INV_011")
+        assert r.fired is False
+
+    def test_silent_low_chain_ratio(self, db):
+        """SA with <80% historical chains → not expected to have chains."""
+        actor = "mixed-sa@proj.iam.gserviceaccount.com"
+        self._seed_history(db, actor, chained_count=5, unchained_count=10)
+        events = _make_events(db, [
+            {"actor_id": actor, "action_type": ActionType.SECRET_ACCESS},
+        ])
+        r = _find(_check(db, events, actor_id=actor), "INV_011")
+        assert r.fired is False
+
+
 # --- inv_score computation ---
 
 
