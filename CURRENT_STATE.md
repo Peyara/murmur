@@ -37,7 +37,33 @@ Session G (2026-04-01): Built benchmark infrastructure. 6 scenarios (3 attack, 2
 
 ## What To Do Next
 
-1. **Weight rebalancing:** Experiment with invariant COUNT as signal, increase sigma_coarse/bridge_new weights. Use benchmark as validation — attacks must still exceed 2x.
-2. **Fresh data pull:** `murmur ingest --gcs-bucket` → verify KMS/compute events → register updated patterns.
-3. **Consider inv_score redesign:** MAX → weighted sum or separate count signal. This is the biggest lever for attack complexity discrimination.
-4. **Deferred:** Live attack injection into GCP sandbox as confidence check.
+### Phase 1: Weight Rebalancing (can start immediately — synthetic data only)
+
+The benchmark runner provides a closed feedback loop. No real data needed.
+
+1. **Diagnose inv_score ceiling.** Currently MAX severity — 2 invariants and 8 produce identical scores. Options:
+   - Add `inv_count` as a separate fusion signal (number of fired invariants, normalized)
+   - Change inv_score to weighted sum (sum of severities / max possible)
+   - Both — count captures breadth, max captures worst-case
+2. **Increase physics signal weights.** sigma_coarse (0.10) and bridge_new (0.10) are underweighted — S04's 3-window EXFIL ratchet only scores 7% above S01's 2-event attack. Experiment with 0.15-0.20.
+3. **Validate after each change:** `murmur benchmark --all --history data/benchmark/history_benign.jsonl --patterns-json data/benchmark/patterns.json` — attacks must still exceed 2x benign avg.
+4. **Target:** S04 should clearly separate from S01 (currently 0.459 vs 0.429 = 7% gap, want 20%+).
+
+### Phase 2: Fresh Data + Pattern Registration (after ~24-48h accumulation — April 3+)
+
+Sandbox diversification deployed April 1 ~20:00 UTC. Wait for sufficient data:
+- KMS encrypt: ~300+ events (every 5 min = ~288/day)
+- Compute metadata: ~24+ events (every hour)
+- Daily cleanup: at least 1 full cycle
+
+Steps:
+1. `murmur ingest --local-dir data/real/` or `--gcs-bucket` with fresh pull
+2. Verify KMS_ENCRYPT and COMPUTE_METADATA_CHANGE events in DB
+3. Register updated sanctioned patterns:
+   - normal-worker: add SECRET (KMS) zone → `[CONTROL, COMPUTE, SECRET, DATA, SECRET]`
+   - maintainer: add COMPUTE zone → `[CONTROL, IDENTITY, SECRET, COMPUTE]`
+4. Re-score and verify discounts apply with new zones
+
+### Phase 3: Deferred
+- Live attack injection into GCP sandbox (optional confidence check)
+- Edge-case benchmark tests (empty scenario, malformed JSONL) — before production
