@@ -19,6 +19,7 @@ class ActionType(StrEnum):
     SECRET_ACCESS = "SECRET_ACCESS"  # nosec B105 — enum value, not a password
     SECRET_ADMIN = "SECRET_ADMIN"  # nosec B105 — CreateSecret, AddSecretVersion
     KMS_DECRYPT = "KMS_DECRYPT"
+    KMS_ENCRYPT = "KMS_ENCRYPT"
     GCS_READ = "GCS_READ"
     GCS_WRITE = "GCS_WRITE"
     GCS_LIST = "GCS_LIST"

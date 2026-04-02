@@ -6,6 +6,7 @@ Three endpoints:
   POST /cleanup — Cleanup: delete output objects older than 1 day
 """
 
+import base64
 import hashlib
 import json
 import logging
@@ -13,7 +14,7 @@ import os
 from datetime import UTC, datetime, timedelta
 
 from flask import Flask, jsonify
-from google.cloud import secretmanager, storage
+from google.cloud import kms, secretmanager, storage
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
@@ -23,10 +24,14 @@ INPUT_BUCKET = os.environ.get("INPUT_BUCKET", "murmur-input-sandbox")
 OUTPUT_BUCKET = os.environ.get("OUTPUT_BUCKET", "murmur-output-sandbox")
 SECRET_NAME = os.environ.get("SECRET_NAME", "secret_high")
 HEALTH_SECRET = os.environ.get("HEALTH_SECRET", "secret_low")
+KMS_LOCATION = os.environ.get("GCP_REGION", "us-central1")
+KMS_KEYRING = os.environ.get("KMS_KEYRING", "murmur-keyring")
+KMS_KEY = os.environ.get("KMS_KEY", "worker-encrypt-key")
 
 # Module-level singletons — clients are thread-safe and reusable
 _sm_client: secretmanager.SecretManagerServiceClient | None = None
 _gcs_client: storage.Client | None = None
+_kms_client: kms.KeyManagementServiceClient | None = None
 
 
 def _get_secret_client() -> secretmanager.SecretManagerServiceClient:
@@ -41,6 +46,21 @@ def _get_storage_client() -> storage.Client:
     if _gcs_client is None:
         _gcs_client = storage.Client(project=PROJECT_ID)
     return _gcs_client
+
+
+def _get_kms_client() -> kms.KeyManagementServiceClient:
+    global _kms_client  # noqa: PLW0603
+    if _kms_client is None:
+        _kms_client = kms.KeyManagementServiceClient()
+    return _kms_client
+
+
+def _kms_encrypt(plaintext: str) -> str:
+    """Encrypt data using Cloud KMS. Generates KMS_DECRYPT audit events."""
+    client = _get_kms_client()
+    key_name = client.crypto_key_path(PROJECT_ID, KMS_LOCATION, KMS_KEYRING, KMS_KEY)
+    response = client.encrypt(request={"name": key_name, "plaintext": plaintext.encode()})
+    return base64.b64encode(response.ciphertext).decode()
 
 
 def _read_secret(secret_name: str) -> str:
@@ -71,14 +91,19 @@ def main_worker():
 
         # 3. Process: hash content + timestamp (secret read is for audit generation, not processing)
         digest = hashlib.sha256(f"{content}:{now.isoformat()}".encode()).hexdigest()[:16]
+
+        # 4. Encrypt digest via KMS (generates KMS audit event in SECRET zone)
+        encrypted_digest = _kms_encrypt(digest)
+
         result = {
             "source": blob.name,
             "digest": digest,
+            "encrypted_digest": encrypted_digest,
             "processed_at": now.isoformat(),
             "input_size": len(content),
         }
 
-        # 4. Write result to output bucket
+        # 5. Write result to output bucket
         output_bucket = client.bucket(OUTPUT_BUCKET)
         output_name = f"results/{now.strftime('%Y-%m-%d')}/{now.strftime('%H%M%S')}_{digest}.json"
         output_blob = output_bucket.blob(output_name)

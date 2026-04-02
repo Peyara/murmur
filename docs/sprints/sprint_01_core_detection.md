@@ -260,8 +260,38 @@ Full report: `docs/rd_reports/2026-03-27_session_c_24h_inspection.md`
 - [x] Fix silent correlation failure: startup validation when `service_worker_map` is empty (warning in `fetch_and_ingest_multi`)
 - [x] Add `delegation_chain` to CanonicalEvent + parser extraction (JSON array of delegation SA emails, stored in events table). Validated: 100% of worker events have `serverless-robot-prod` delegation chain.
 
+**Session F findings (2026-04-01): R&D review + provenance validation**
+
+Data refresh: 11,286 events (March 24 → April 1), 630 windows, 916 scored pairs.
+
+Provenance validation:
+- [x] normal-worker-sa: 17% average discount (pattern registered, WEAK provenance via Scheduler→CloudRun→audit correlation)
+- [x] maintenance-sa: 20.7% average discount after adding `"maintainer"` to `service_worker_map` — was 0% because correlation chain was broken
+- [x] WATCH alerts: 119 → 10 after both fixes. 109 false WATCH alerts from maintenance-sa eliminated.
+- [x] Score separation: NORMAL avg=0.058, WATCH avg=0.31, MEDIUM avg=0.65. Clear tiers.
+- [x] All 7 MEDIUM alerts from first 4 days (hydration period). Post-hydration: stable, no new alerts. Validates hydration model.
+
+Design decision — auto-discovery (product roadmap, NOT Sprint 1):
+- `service_worker_map` is hardcoded per-environment. Product path: hydration auto-discovers mappings from observed (service → SA) patterns. `validate_service_worker_map()` already has the observation logic; needs write-back.
+- Sanctioned patterns should be auto-proposed from observed recurring cadences during hydration. Human approves. Pattern lifecycle: discovered → proposed → approved → active.
+
+**Sandbox diversification (Session F, 2026-04-01):**
+- [x] EXFIL_RISK bucket: `gs://public-export-sandbox` created. Matches `exfil_risk_patterns`. Zero baseline — attack writes here.
+- [x] INV_011: delegation chain anomaly. SA acting without expected delegation chain → severity 5. 5 tests.
+- [x] KMS in normal-worker: encrypt output digest via Cloud KMS `worker-encrypt-key`. Exercises INV_008.
+- [x] Compute metadata in maintainer: VM label update (`last-maintenance`). Exercises INV_009.
+- [ ] Deploy updated normal-worker rev 4 + maintainer rev 4
+- [ ] Verify new audit events flowing (KMS encrypt, compute setLabels)
+- [ ] Register updated sanctioned patterns after ~3h of new data
+
+**Deferred to Sprint 1B (Tier 3 — need more baseline data or architectural change):**
+- [ ] Cross-actor pattern detection: actor A grants access to actor B who escalates. Requires cross-actor window analysis (architectural change to scoring). Currently invisible to per-actor invariants.
+- [ ] Data volume anomaly: detect abnormal GCS read/write volume per actor per window. New invariant design + baseline calibration.
+- [ ] Temporal anomaly: detect action at unusual time-of-day for actor. Needs longer baseline (weekday/weekend patterns, >2 weeks).
+- [ ] Weight rebalancing: try 2-3 fusion weight configs on attack+benign data. Increase physics signal influence. Evaluate separation.
+
 **Parked for Sprint 1B (attack injection phase):**
-- [ ] EXFIL_RISK baseline: (a) treat first-ever zone event as maximum novelty in scoring layer, (b) exercise zone during attack injection by creating a `temp-export-*` bucket
+- [ ] EXFIL_RISK baseline: (a) treat first-ever zone event as maximum novelty in scoring layer, (b) exercise zone during attack injection by writing to `gs://public-export-sandbox`
 - [ ] system_event parser: new `system_event_parser.py` for Cloud Run revision deployments. Extracts deployer identity, image hash, scaling config. Map to `COMPUTE_UPDATE` / `COMPUTE` zone. Needed for deploy-based attack detection.
 - [ ] GCP internal SA allow-list: add `service-agent-manager@system.gserviceaccount.com` to `known_initiators.json` with infrastructure tag. Prevents invariant false positives on GCP internal IAM maintenance.
 - [ ] `ReplaceService` -> ACTION_MAP: add `("run.googleapis.com", "ReplaceService")` -> `(COMPUTE_UPDATE, COMPUTE)`. New `COMPUTE_UPDATE` action type.

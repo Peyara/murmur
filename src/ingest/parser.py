@@ -41,6 +41,7 @@ ACTION_MAP: list[tuple[str, str, ActionType, TargetZone]] = [
     ("secretmanager.googleapis.com", "AccessSecretVersion", ActionType.SECRET_ACCESS, TargetZone.SECRET),
     # KMS
     ("cloudkms.googleapis.com", "Decrypt", ActionType.KMS_DECRYPT, TargetZone.SECRET),
+    ("cloudkms.googleapis.com", "Encrypt", ActionType.KMS_ENCRYPT, TargetZone.SECRET),
     # Storage — list before get (more specific first)
     ("storage.googleapis.com", "storage.objects.list", ActionType.GCS_LIST, TargetZone.DATA),
     ("storage.googleapis.com", "storage.objects.get", ActionType.GCS_READ, TargetZone.DATA),
@@ -50,6 +51,7 @@ ACTION_MAP: list[tuple[str, str, ActionType, TargetZone]] = [
     # Compute — create before metadata (more specific first)
     ("compute.googleapis.com", "instances.insert", ActionType.COMPUTE_CREATE, TargetZone.COMPUTE),
     ("compute.googleapis.com", "setMetadata", ActionType.COMPUTE_METADATA_CHANGE, TargetZone.COMPUTE),
+    ("compute.googleapis.com", "setLabels", ActionType.COMPUTE_METADATA_CHANGE, TargetZone.COMPUTE),
     # Cloud Run — SetIamPolicy before CreateService
     ("run.googleapis.com", "SetIamPolicy", ActionType.IAM_SET_POLICY, TargetZone.CONTROL),
     ("run.googleapis.com", "CreateService", ActionType.COMPUTE_CREATE, TargetZone.COMPUTE),
