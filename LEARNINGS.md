@@ -6,6 +6,65 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-01 — R&D — Session G: Sprint 1B benchmark infrastructure + signal validation gate
+
+**Session Summary**
+- Mode: R&D, local
+- Built Sprint 1B benchmark infrastructure: runner, 6 scenarios, report formatter, 33 tests, CLI command.
+- Signal validation gate PASSED: all 3 attack scenarios exceed 2x benign average residual_risk.
+- 388 tests green (355 existing + 33 new).
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Synthetic JSONL over live GCP injection | Live injection; hybrid | Repeatable, deterministic, no GCP costs, same code path. Live injection deferred as optional confidence check. |
+| In-memory DuckDB per scenario | Shared persistent DB; temp file DB | Isolation guarantees repeatability and prevents contamination. Matches conftest.py pattern. |
+| Scenarios in `data/benchmark/` not `data/fixtures/scenarios/` | Keep under fixtures | Fixtures scanned by `ingest --sample` — broke existing tests. `data/benchmark/` is correct per spec. |
+| History seeding for benign scenarios | No history; full 30 days | No history eliminates separation (cold-start). Full 30 days is overkill. 2 windows gives sufficient lookback. |
+| Accept B02 firing INV_006 on new secret target | Add exception; suppress when SECRET_ADMIN co-occurs | Correct behavior — new targets should be flagged. Fix deferred. |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| `compute_inv_score` uses MAX severity, not SUM — 8 invariants produce same inv_score as 2 | Limits discrimination between simple and complex attacks | Consider invariant COUNT as separate signal or weighted sum in weight rebalancing |
+| Cold-start (no history) eliminates benign/attack separation entirely | Validates hydration design — system NEEDS observation period | Document as expected behavior; benchmark always seeds history |
+| B02 fires INV_006 on new secret target even with history | New secret names (rotations) trigger "novel accessor" invariant | Consider SECRET_ADMIN co-occurrence exception |
+| S04 (7 events, 3 windows, EXFIL) only 7% higher than S01 (2 events) | Physics signals not differentiating complex vs simple attacks | Weight rebalancing should increase sigma_coarse and bridge_new weights |
+| Provenance discount works: B01 fusion=0.066 → residual=0.054 (18%) | Pattern match + WEAK provenance → discount applied correctly | Validates provenance architecture |
+| Signal ordering: B01 (0.054) < S13 (0.066) < B02 (0.310) < S01 (0.429) < S07 (0.442) < S04 (0.459) | Clean separation between all scenario types | Benchmark validates full detection architecture |
+
+**Benchmark Results (with history + patterns)**
+
+| Scenario | Type | MaxRes | Tier | Invariants |
+|---|---|---|---|---|
+| B01 deploy | Benign | 0.054 | NORMAL | none |
+| S13 no provenance | Hybrid | 0.066 | NORMAL | none |
+| B02 secret rotation | Benign | 0.310 | WATCH | INV_006 |
+| S01 key+secret | Attack | 0.429 | WATCH | INV_002, INV_003, INV_006, INV_010 |
+| S07 cross-actor | Attack | 0.442 | WATCH | INV_001, INV_004, INV_005, INV_006 |
+| S04 slow ratchet | Attack | 0.459 | WATCH | INV_001-005, INV_006, INV_008, INV_010 |
+
+Attack/benign ratio: 2.4-2.5x (threshold: 2.0x) ✓
+
+**CLAUDE.md Exceptions**
+- "Tests before code": Tests written after implementation in R&D mode — needed empirical scores for thresholds. One-off, permitted by R&D mode.
+- "One feature per session": Runner + scenarios + tests + CLI as single deliverable. One-off — logically one feature.
+
+**Open Questions**
+1. inv_score MAX vs SUM — biggest weight rebalancing question
+2. B02 INV_006 on rotation — correct or overly sensitive?
+3. Physics signal differentiation weak (S04 vs S01 only 7%)
+4. Fresh data verification deferred (KMS/compute events)
+5. Live DB pattern registration pending
+
+**CLAUDE.md Evolution Candidates**
+- "Benchmark-first validation gate" — prove separation quantitatively before claiming detection works. Watch.
+- "History seeding for cold-start testing" — temporal lookback systems need history fixtures. Watch.
+
+---
+
 ### 2026-04-01 — R&D — Session F: Data refresh, provenance validation, R&D review
 
 **Session Summary**

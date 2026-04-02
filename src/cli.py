@@ -283,6 +283,55 @@ def show_trigger_chain_cmd(event_id, db_path):
         conn.close()
 
 
+@cli.command("benchmark")
+@click.option("--scenario", type=click.Path(exists=True, dir_okay=False), help="Run a single scenario JSONL file.")
+@click.option("--all", "run_all", is_flag=True, help="Run all scenarios in data/benchmark/.")
+@click.option(
+    "--history", type=click.Path(exists=True, dir_okay=False),
+    help="History JSONL to seed (for benign scenarios).",
+)
+@click.option(
+    "--patterns-json", type=click.Path(exists=True, dir_okay=False),
+    help="JSON file with sanctioned patterns to register.",
+)
+def benchmark(scenario: str | None, run_all: bool, history: str | None, patterns_json: str | None):
+    """Run benchmark scenarios through the full scoring pipeline."""
+    import json as _json
+
+    from src.benchmark.report import format_comparison_table, format_scenario_report
+    from src.benchmark.runner import run_scenario
+
+    if not scenario and not run_all:
+        raise click.UsageError("Specify --scenario PATH or --all.")
+    if scenario and run_all:
+        raise click.UsageError("--scenario and --all are mutually exclusive.")
+
+    patterns = None
+    if patterns_json:
+        patterns = _json.loads(Path(patterns_json).read_text())
+
+    if scenario:
+        result = run_scenario(scenario, history_path=history, patterns=patterns)
+        click.echo(format_scenario_report(result))
+    else:
+        benchmark_dir = Path("data/benchmark")
+        if not benchmark_dir.exists():
+            click.echo("data/benchmark/ directory not found.", err=True)
+            sys.exit(1)
+
+        results = {}
+        for f in sorted(benchmark_dir.glob("*.jsonl")):
+            if f.name.startswith("history"):
+                continue
+            name = f.stem
+            click.echo(f"Running {name}...")
+            result = run_scenario(str(f), history_path=history, patterns=patterns)
+            results[name] = result
+
+        click.echo()
+        click.echo(format_comparison_table(results))
+
+
 @cli.command("inspect")
 @click.argument("directory", type=click.Path(exists=True, file_okay=False))
 @click.option(
