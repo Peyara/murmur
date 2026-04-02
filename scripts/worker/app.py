@@ -93,7 +93,12 @@ def main_worker():
         digest = hashlib.sha256(f"{content}:{now.isoformat()}".encode()).hexdigest()[:16]
 
         # 4. Encrypt digest via KMS (generates KMS audit event in SECRET zone)
-        encrypted_digest = _kms_encrypt(digest)
+        try:
+            encrypted_digest = _kms_encrypt(digest)
+        except Exception as e:
+            # Non-fatal — KMS may not be configured in all environments
+            logger.warning("KMS encrypt failed (non-fatal): %s", e)
+            encrypted_digest = None
 
         result = {
             "source": blob.name,
