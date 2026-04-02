@@ -286,8 +286,14 @@ def show_trigger_chain_cmd(event_id, db_path):
 @cli.command("benchmark")
 @click.option("--scenario", type=click.Path(exists=True, dir_okay=False), help="Run a single scenario JSONL file.")
 @click.option("--all", "run_all", is_flag=True, help="Run all scenarios in data/benchmark/.")
-@click.option("--history", type=click.Path(exists=True, dir_okay=False), help="History JSONL to seed (for benign scenarios).")
-@click.option("--patterns-json", type=click.Path(exists=True, dir_okay=False), help="JSON file with sanctioned patterns to register.")
+@click.option(
+    "--history", type=click.Path(exists=True, dir_okay=False),
+    help="History JSONL to seed (for benign scenarios).",
+)
+@click.option(
+    "--patterns-json", type=click.Path(exists=True, dir_okay=False),
+    help="JSON file with sanctioned patterns to register.",
+)
 def benchmark(scenario: str | None, run_all: bool, history: str | None, patterns_json: str | None):
     """Run benchmark scenarios through the full scoring pipeline."""
     import json as _json

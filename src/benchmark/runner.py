@@ -14,7 +14,7 @@ import duckdb
 
 from config.settings import SETTINGS
 from src.ingest.fetch import SingleFileFetcher, fetch_and_ingest
-from src.provenance.patterns import register_pattern
+from src.provenance.patterns import list_patterns, register_pattern
 from src.provenance.residual import compute_residual_risk
 from src.score.fusion import compute_fusion
 from src.world.graph import compute_zone_flux
@@ -161,7 +161,6 @@ def run_scenario(
         _window_all(db)
 
         # Score all (window, actor) pairs
-        from src.provenance.patterns import list_patterns
         cached_patterns = list_patterns(db, include_inactive=False)
 
         pairs = db.execute(
@@ -173,9 +172,9 @@ def run_scenario(
             # Skip history-only windows when reporting results
             if ws in pre_windows:
                 # Still score history so invariant lookback works
-                compute_fusion(db, ws, actor_id, known_initiators)
+                hist_fusion = compute_fusion(db, ws, actor_id, known_initiators)
                 compute_residual_risk(
-                    db, ws, actor_id, 0.0, known_initiators, SETTINGS,
+                    db, ws, actor_id, hist_fusion, known_initiators, SETTINGS,
                     cached_patterns=cached_patterns,
                 )
                 continue
