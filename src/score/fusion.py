@@ -6,6 +6,7 @@ to risk_scores. residual_risk = fusion_raw for now (provenance discount
 comes in Session E).
 """
 
+import math
 from datetime import datetime
 
 import duckdb
@@ -15,13 +16,14 @@ from src.score.invariants import check_invariants, compute_inv_score
 from src.score.novelty import compute_novelty_score
 from src.score.physics import compute_delta_f
 
-# Initial weights (calibrate in Sprint 1B)
+# Calibrated weights (Sprint 1B rebalancing)
 FUSION_WEIGHTS = {
-    "inv_score": 0.35,
-    "novelty_score": 0.20,
-    "sigma_coarse": 0.10,
+    "inv_score": 0.20,
+    "inv_count": 0.15,
+    "novelty_score": 0.30,
+    "sigma_coarse": 0.05,
     "bridge_new": 0.10,
-    "delta_f": 0.10,
+    "delta_f": 0.05,
     "burst_per_min": 0.08,
     "breadth_entropy": 0.07,
 }
@@ -29,7 +31,7 @@ FUSION_WEIGHTS = {
 # Normalization bounds (empirical, refined in Sprint 1B)
 NORM_BOUNDS = {
     "inv_score": 5.0,
-    "sigma_coarse": 10.0,
+    "inv_count": 10.0,
     "novelty_score": 10.0,
     "bridge_new": 5.0,
     "delta_f": 5.0,
@@ -37,12 +39,21 @@ NORM_BOUNDS = {
     "breadth_entropy": 4.0,
 }
 
+# Sigmoid parameters for sigma_coarse (always > 0, ramps under adversarial load)
+SIGMA_SIGMOID_K = 1.0   # steepness
+SIGMA_SIGMOID_X0 = 3.0  # midpoint (output = 0.5 when sigma = 3.0)
+
 
 def normalize(value: float, max_bound: float) -> float:
     """Normalize a value to [0, 1] range. Clips at both ends."""
     if max_bound <= 0:
         return 0.0
     return max(0.0, min(value / max_bound, 1.0))
+
+
+def sigmoid_normalize(value: float, k: float = SIGMA_SIGMOID_K, x0: float = SIGMA_SIGMOID_X0) -> float:
+    """Sigmoid normalization to (0, 1). Never zero — always a baseline hum."""
+    return 1.0 / (1.0 + math.exp(-k * (value - x0)))
 
 
 def compute_fusion(
@@ -74,12 +85,14 @@ def compute_fusion(
     bridge_new = zf_row[1] if zf_row else 0
 
     # Get events for invariant checks
-    # Column order must match CanonicalEvent.__init__ signature exactly.
+    # Column order must match CanonicalEvent dataclass field order exactly.
     # If CanonicalEvent fields change, update this query to match.
     _EVENT_COLS = (
         "event_id, ts, window_start, actor_id, actor_type, "
         "action_type, target_id, target_type, target_zone, result, "
+        "actor_subtype, orchestrator_id, "
         "trigger_ref, provenance_level, provenance_source, "
+        "action_subtype, tool_name, tool_parameters_hash, model_id, "
         "correlation_confidence, delegation_chain, project_id, env, "
         "is_deploy, is_incident, is_infrastructure, risk_tags, raw_ref, "
         "coverage_flag"
@@ -93,7 +106,7 @@ def compute_fusion(
 
     # Invariants
     inv_results = check_invariants(db, window_start, actor_id, events, known_initiators)
-    inv_score, fired_json = compute_inv_score(inv_results)
+    inv_score, inv_count, fired_json = compute_inv_score(inv_results)
 
     # Physics: delta_F
     delta_f = compute_delta_f(db, window_start, sigma_coarse)
@@ -104,7 +117,8 @@ def compute_fusion(
     # Normalize all signals
     signals = {
         "inv_score": normalize(inv_score, NORM_BOUNDS["inv_score"]),
-        "sigma_coarse": normalize(sigma_coarse, NORM_BOUNDS["sigma_coarse"]),
+        "inv_count": normalize(float(inv_count), NORM_BOUNDS["inv_count"]),
+        "sigma_coarse": sigmoid_normalize(sigma_coarse),
         "novelty_score": normalize(novelty_score, NORM_BOUNDS["novelty_score"]),
         "bridge_new": normalize(float(bridge_new), NORM_BOUNDS["bridge_new"]),
         "delta_f": normalize(delta_f, NORM_BOUNDS["delta_f"]),
@@ -125,13 +139,14 @@ def compute_fusion(
     db.execute(
         """
         INSERT INTO risk_scores (
-            window_start, actor_id, inv_score, sigma_coarse, novelty_score,
-            bridge_new, delta_f, burst_per_min, breadth_entropy,
+            window_start, actor_id, inv_score, inv_count, sigma_coarse,
+            novelty_score, bridge_new, delta_f, burst_per_min, breadth_entropy,
             closure_ratio, orphaned_privilege, fusion_raw, residual_risk,
             fired_invariants, explanation
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (window_start, actor_id) DO UPDATE SET
             inv_score = EXCLUDED.inv_score,
+            inv_count = EXCLUDED.inv_count,
             sigma_coarse = EXCLUDED.sigma_coarse,
             novelty_score = EXCLUDED.novelty_score,
             bridge_new = EXCLUDED.bridge_new,
@@ -145,7 +160,7 @@ def compute_fusion(
         """,
         [
             window_start, actor_id,
-            inv_score, sigma_coarse, novelty_score,
+            inv_score, float(inv_count), sigma_coarse, novelty_score,
             bridge_new, delta_f, burst_per_min, breadth_entropy,
             0.0,  # closure_ratio (Session E)
             0.0,  # orphaned_privilege (Session E)

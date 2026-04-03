@@ -303,11 +303,11 @@ def check_invariants(
     ]
 
 
-def compute_inv_score(results: list[InvariantResult]) -> tuple[float, str]:
-    """Compute inv_score (max severity) and fired_invariants JSON."""
+def compute_inv_score(results: list[InvariantResult]) -> tuple[float, int, str]:
+    """Compute inv_score (max severity), inv_count, and fired_invariants JSON."""
     fired = [r for r in results if r.fired]
     if not fired:
-        return 0.0, "[]"
+        return 0.0, 0, "[]"
     score = max(r.severity for r in fired)
     fired_ids = sorted(r.id for r in fired)
-    return float(score), json.dumps(fired_ids)
+    return float(score), len(fired), json.dumps(fired_ids)

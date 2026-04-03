@@ -1,7 +1,7 @@
 """GCP Cloud Audit Log parser -> CanonicalEvent.
 
 Maps raw GCP audit log JSON entries to the canonical event schema.
-13 ACTION_MAP entries (using substring matching) cover 14 GCP method
+14 ACTION_MAP entries (using substring matching) cover 15 GCP method
 patterns across 13 action types and 6 trust zones.
 """
 
@@ -32,6 +32,7 @@ ACTION_MAP: list[tuple[str, str, ActionType, TargetZone]] = [
     ("iam.googleapis.com", "DeleteServiceAccountKey", ActionType.IAM_DELETE_KEY, TargetZone.IDENTITY),
     ("iam.googleapis.com", "CreateServiceAccount", ActionType.IAM_CREATE_SA, TargetZone.IDENTITY),
     ("iam.googleapis.com", "serviceAccounts.actAs", ActionType.IAM_IMPERSONATE, TargetZone.IDENTITY),
+    ("iam.googleapis.com", "SetIAMPolicy", ActionType.IAM_SET_POLICY, TargetZone.CONTROL),
     ("iam.googleapis.com", "SetIamPolicy", ActionType.IAM_SET_POLICY, TargetZone.CONTROL),
     ("iamcredentials.googleapis.com", "GenerateAccessToken", ActionType.IAM_IMPERSONATE, TargetZone.IDENTITY),
     ("iamcredentials.googleapis.com", "GenerateIdToken", ActionType.IAM_IMPERSONATE, TargetZone.IDENTITY),

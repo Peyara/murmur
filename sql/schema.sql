@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS risk_scores (
     window_start        TIMESTAMP NOT NULL,
     actor_id            VARCHAR NOT NULL,
     inv_score           FLOAT DEFAULT 0.0,
+    inv_count           FLOAT DEFAULT 0.0,
     sigma_coarse        FLOAT DEFAULT 0.0,
     novelty_score       FLOAT DEFAULT 0.0,
     bridge_new          FLOAT DEFAULT 0.0,
