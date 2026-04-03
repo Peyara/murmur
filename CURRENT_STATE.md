@@ -4,66 +4,39 @@
 
 ## Active Sprint
 
-**Sprint 1B: Signal Validation Gate** — Benchmark infrastructure complete. Weight rebalancing + fresh data pull remaining.
+**Sprint 1B: Signal Validation Gate** — Complete. PR #19 ready for merge.
 
 ## Last Completed Milestone
 
-Session G (2026-04-01): Built benchmark infrastructure. 6 scenarios (3 attack, 2 benign, 1 hybrid) validated through full pipeline. Signal validation gate PASSED — attacks score 2.4-2.5x benign average. 388 tests green.
+Session H (2026-04-02): Fresh GCS data pull, fixed 3 scoring bugs (parser case mismatch, column mapping, weight rebalancing). WATCH dropped 841→7 on real data. 395 tests green. Attack/benign ratio 2.7x.
 
 ## GCP Sandbox Status (all live, accumulating data)
 
 - Cloud Run `normal-worker` rev 4: reads secret + GCS, encrypts via KMS, writes output. Every 5 min.
-- Cloud Run `maintainer` rev 4: rotates secret, generates token, toggles IAM, updates VM label. Every hour.
-- KMS keyring `murmur-keyring` / key `worker-encrypt-key`: created, normal-worker-sa has encrypt permission.
-- EXFIL_RISK bucket: `gs://public-export-sandbox` created. Empty (attack injection target).
-- Scheduler jobs: trigger-normal-worker (5min), trigger-health-check (hourly), trigger-cleanup (daily), trigger-maintainer (hourly)
-- Local snapshot: `data/real/` (refreshed 2026-04-01, includes 851 blobs through 19:55 UTC)
+- Cloud Run `maintainer` rev 4: rotates secret, toggles IAM, updates VM label. Every hour.
+- KMS keyring `murmur-keyring` / key `worker-encrypt-key`: active, normal-worker encrypting every 5 min.
+- Local snapshot: `data/real/` (synced 2026-04-02, includes data through April 3 00:55 UTC)
+- Live DB: `murmur.duckdb` — 14,560 events, scored with rebalanced weights.
 
 ## Open Blockers / Questions
 
-1. **inv_score MAX vs SUM** — biggest weight rebalancing question. 8 invariants produce same score as 2.
-2. Physics signal differentiation weak — S04 only 7% higher than S01 despite much more complex attack.
-3. Fresh data pull needed — verify KMS_ENCRYPT and COMPUTE_METADATA_CHANGE events flowing.
-4. Register updated sanctioned patterns on live DB (add KMS zone for normal-worker, COMPUTE for maintainer).
-5. B02 fires INV_006 on new secret targets — correct or overly sensitive?
+1. **PR #19 needs merge** — fix/scoring-rebalance-session-h branch, 2 commits.
+2. S04-S01 gap at 15% (target 20%) — sigma_coarse should close it under adversarial load.
+3. burst_per_min normalization inverted for stealth attacks — parked.
+4. B02 INV_006 on secret rotation — correct or overly sensitive?
+5. Checkpoint bug for multi-prefix local ingestion (lexicographic ordering) — workaround: use GCS source_id.
+6. Column mapping fragility — `_EVENT_COLS` manually synced with CanonicalEvent. Deferred NIT.
 
 ## Files to Read for Context
 
 - **Sprint 1 spec:** `docs/sprints/sprint_01_core_detection.md`
-- **Benchmark runner:** `src/benchmark/runner.py` (in-memory isolated scenario runner)
-- **Scenarios:** `data/benchmark/` (s01, s04, s07, b01, b02, s13 + history + patterns.json)
-- **Benchmark tests:** `tests/test_benchmark.py` (33 tests, all passing)
-- **Session G learnings:** `LEARNINGS.md` (top entry)
+- **Fusion weights:** `src/score/fusion.py` (FUSION_WEIGHTS, sigmoid_normalize)
+- **Session H learnings:** `LEARNINGS.md` (top entry)
+- **PR #19:** https://github.com/Peyara/murmur/pull/19
 
 ## What To Do Next
 
-### Phase 1: Weight Rebalancing (can start immediately — synthetic data only)
-
-The benchmark runner provides a closed feedback loop. No real data needed.
-
-1. **Diagnose inv_score ceiling.** Currently MAX severity — 2 invariants and 8 produce identical scores. Options:
-   - Add `inv_count` as a separate fusion signal (number of fired invariants, normalized)
-   - Change inv_score to weighted sum (sum of severities / max possible)
-   - Both — count captures breadth, max captures worst-case
-2. **Increase physics signal weights.** sigma_coarse (0.10) and bridge_new (0.10) are underweighted — S04's 3-window EXFIL ratchet only scores 7% above S01's 2-event attack. Experiment with 0.15-0.20.
-3. **Validate after each change:** `murmur benchmark --all --history data/benchmark/history_benign.jsonl --patterns-json data/benchmark/patterns.json` — attacks must still exceed 2x benign avg.
-4. **Target:** S04 should clearly separate from S01 (currently 0.459 vs 0.429 = 7% gap, want 20%+).
-
-### Phase 2: Fresh Data + Pattern Registration (after ~24-48h accumulation — April 3+)
-
-Sandbox diversification deployed April 1 ~20:00 UTC. Wait for sufficient data:
-- KMS encrypt: ~300+ events (every 5 min = ~288/day)
-- Compute metadata: ~24+ events (every hour)
-- Daily cleanup: at least 1 full cycle
-
-Steps:
-1. `murmur ingest --local-dir data/real/` or `--gcs-bucket` with fresh pull
-2. Verify KMS_ENCRYPT and COMPUTE_METADATA_CHANGE events in DB
-3. Register updated sanctioned patterns:
-   - normal-worker: add SECRET (KMS) zone → `[CONTROL, COMPUTE, SECRET, DATA, SECRET]`
-   - maintainer: add COMPUTE zone → `[CONTROL, IDENTITY, SECRET, COMPUTE]`
-4. Re-score and verify discounts apply with new zones
-
-### Phase 3: Deferred
-- Live attack injection into GCP sandbox (optional confidence check)
-- Edge-case benchmark tests (empty scenario, malformed JSONL) — before production
+1. **Merge PR #19** after any final review.
+2. **Live attack injection (Phase 3)** — inject adversarial activity into GCP sandbox to validate sigma_coarse activation and close S04-S01 gap.
+3. **Deferred review fixes** — column mapping generation from dataclasses.fields() on a fix/ branch.
+4. **Edge-case benchmark tests** — empty scenario, malformed JSONL — before production.

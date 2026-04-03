@@ -6,6 +6,71 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-02 — R&D — Session H: Fresh data pull, 3 scoring bugs fixed, weight rebalancing
+
+**Session Summary**
+- Mode: R&D, local
+- Pulled fresh GCS data (5,028 new events including 278 KMS_ENCRYPT and 46 COMPUTE_METADATA_CHANGE).
+- Discovered and fixed parser case mismatch (SetIAMPolicy) — 290 IAM events reclassified.
+- Discovered and fixed column mapping bug in fusion.py — garbled delegation_chain caused INV_011 to false-fire on all SA windows (WATCH 841→7).
+- Rebalanced fusion weights: added inv_count, sigmoid sigma_coarse, recalibrated 8 weights.
+- PR #19 opened, reviewed (0 blockers, 3 warnings), warnings fixed. 395 tests green.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| GCS ingest with new source_id (dedup handles overlaps) | Reset local checkpoint; gsutil rsync then local ingest | Cleanest path, no checkpoint manipulation needed |
+| UPDATE misclassified IAM rows in-place | Delete + re-ingest; rebuild DB | event_id doesn't include action_type — safe and fast |
+| Sigmoid normalization for sigma_coarse | Linear with floor; log normalization | Natural inflection, never zero, saturates — maps to baseline hum → sudden anomaly |
+| Reduce sigma_coarse weight to 0.05 | Keep 0.10; increase for adversarial importance | Dead weight in peacetime benchmarks; keep warm, revisit under adversarial load |
+| Give freed weight to novelty (0.20→0.30) | Split with bridge_new; boost inv_count | Novelty is strongest discriminator in current data |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| GCP uses inconsistent method name capitalization: `SetIamPolicy` (resource mgr) vs `SetIAMPolicy` (IAM admin) | 290 events invisible to scoring | Added both variants to ACTION_MAP |
+| `_EVENT_COLS` in fusion.py skipped 6 optional CanonicalEvent fields, garbling all fields after position 10 | INV_011 false-fired on every SA window; 77% of real-data windows incorrectly in WATCH | Fixed column list; added comment documenting coupling |
+| Benchmark suite tests different code path than production scoring (Python objects vs DB reads) | Column mapping bug was invisible to 388 tests | **Key learning: always validate through production code path with real data** |
+| Checkpoint system uses lexicographic blob ordering — new blobs in earlier-sorting sub-prefixes are skipped | Local re-ingestion would miss new activity/data_access blobs after system_event checkpoint | Worked around with GCS source_id; bug remains for local ingestion |
+| burst_per_min is inverted for stealth attacks — benign workers burst faster (2.67/min) than attacks (0.30/min) | Low burst could indicate stealth, but normalization treats high burst as risky | Parked — needs deeper thought on per-actor-type normalization |
+
+**Benchmark Results (after rebalancing)**
+
+| Scenario | Type | MaxRes | Tier | Invariants |
+|---|---|---|---|---|
+| B01 deploy | Benign | 0.064 | NORMAL | none |
+| B02 secret rotation | Benign | 0.201 | NORMAL | INV_006 |
+| S13 no provenance | Hybrid | 0.078 | NORMAL | none |
+| S01 key+secret | Attack | 0.362 | WATCH | INV_002, INV_003, INV_006, INV_010 |
+| S07 cross-actor | Attack | 0.354 | WATCH | INV_001, INV_004, INV_005, INV_006 |
+| S04 slow ratchet | Attack | 0.416 | WATCH | INV_001-005, INV_006, INV_008, INV_010 |
+
+Attack/benign ratio: 2.7x (was 2.4x). S04-S01 gap: 15% (was 7%).
+
+**Real Data Results (1098 actor-window pairs)**
+
+| Tier | Before session | After session |
+|---|---|---|
+| HIGH | 1 | 1 |
+| MEDIUM | 5 | 3 |
+| WATCH | 841 | 7 |
+| NORMAL | 250 | 1087 |
+
+**CLAUDE.md Exceptions**
+- "Tests before code": fixes implemented before tests (R&D mode). Tests added in review fix commit. One-off.
+- "One feature per session": three fixes in one PR — discovery-driven, logically one deliverable. One-off.
+
+**Open Questions**
+1. S04-S01 gap at 15% (target 20%) — will sigma_coarse close it under adversarial load?
+2. Column mapping fragility — generate from dataclasses.fields()?
+3. burst_per_min normalization inverted for stealth attacks
+4. B02 INV_006 on rotation — correct or overly sensitive?
+5. Checkpoint bug for multi-prefix local ingestion (lexicographic ordering)
+
+---
+
 ### 2026-04-01 — R&D — Session G: Sprint 1B benchmark infrastructure + signal validation gate
 
 **Session Summary**
