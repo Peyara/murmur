@@ -53,7 +53,8 @@ def normalize(value: float, max_bound: float) -> float:
 
 def sigmoid_normalize(value: float, k: float = SIGMA_SIGMOID_K, x0: float = SIGMA_SIGMOID_X0) -> float:
     """Sigmoid normalization to (0, 1). Never zero — always a baseline hum."""
-    return 1.0 / (1.0 + math.exp(-k * (value - x0)))
+    exponent = max(-500.0, min(500.0, -k * (value - x0)))
+    return 1.0 / (1.0 + math.exp(exponent))
 
 
 def compute_fusion(
