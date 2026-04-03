@@ -400,8 +400,9 @@ class TestInvScore:
             InvariantResult("INV_001", False, 0, ""),
             InvariantResult("INV_002", False, 0, ""),
         ]
-        score, json_str = compute_inv_score(results)
+        score, count, json_str = compute_inv_score(results)
         assert score == 0
+        assert count == 0
         assert json_str == "[]"
 
     def test_single_fire(self):
@@ -409,8 +410,9 @@ class TestInvScore:
             InvariantResult("INV_001", True, 5, "policy change"),
             InvariantResult("INV_002", False, 0, ""),
         ]
-        score, json_str = compute_inv_score(results)
+        score, count, json_str = compute_inv_score(results)
         assert score == 5
+        assert count == 1
         assert "INV_001" in json_str
 
     def test_max_severity(self):
@@ -418,8 +420,9 @@ class TestInvScore:
             InvariantResult("INV_004", True, 4, "impersonation"),
             InvariantResult("INV_001", True, 5, "policy change"),
         ]
-        score, _ = compute_inv_score(results)
+        score, count, _ = compute_inv_score(results)
         assert score == 5
+        assert count == 2
 
     def test_fired_json_contains_all(self):
         results = [
@@ -427,7 +430,8 @@ class TestInvScore:
             InvariantResult("INV_004", True, 4, "b"),
             InvariantResult("INV_009", True, 5, "c"),
         ]
-        _, json_str = compute_inv_score(results)
+        _, count, json_str = compute_inv_score(results)
+        assert count == 3
         import json
         fired = json.loads(json_str)
         assert sorted(fired) == ["INV_001", "INV_004", "INV_009"]
