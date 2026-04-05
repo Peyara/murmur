@@ -25,7 +25,9 @@ class MurmurSettings:
     gcs_bucket: str = field(default_factory=lambda: os.environ.get("GCS_AUDIT_BUCKET", ""))
     gcs_prefix: str = "cloudaudit.googleapis.com"  # legacy — kept for backward compat
     gcs_prefixes: list[str] = field(default_factory=lambda: [
-        "cloudaudit.googleapis.com",
+        "cloudaudit.googleapis.com/activity",
+        "cloudaudit.googleapis.com/data_access",
+        "cloudaudit.googleapis.com/system_event",
         "cloudscheduler.googleapis.com",
         "run.googleapis.com",
     ])

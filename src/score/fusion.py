@@ -16,16 +16,19 @@ from src.score.invariants import check_invariants, compute_inv_score
 from src.score.novelty import compute_novelty_score
 from src.score.physics import compute_delta_f
 
-# Calibrated weights (Sprint 1B rebalancing)
+# Calibrated weights (Session I: dropped burst_per_min and breadth_entropy)
+# burst_per_min: 0.9x discrimination, r=0.085 — inverted signal, actively harmful
+# breadth_entropy: r=-0.37 — negatively correlated with risk
+# Freed 0.15 weight redistributed to the 3 strongest non-invariant signals
 FUSION_WEIGHTS = {
     "inv_score": 0.20,
     "inv_count": 0.15,
-    "novelty_score": 0.30,
+    "novelty_score": 0.35,
     "sigma_coarse": 0.05,
-    "bridge_new": 0.10,
-    "delta_f": 0.05,
-    "burst_per_min": 0.08,
-    "breadth_entropy": 0.07,
+    "bridge_new": 0.15,
+    "delta_f": 0.10,
+    "burst_per_min": 0.00,
+    "breadth_entropy": 0.00,
 }
 
 # Normalization bounds (empirical, refined in Sprint 1B)

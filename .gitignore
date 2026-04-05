@@ -30,3 +30,9 @@ application_default_credentials.json
 # Raw audit log data (real logs with project IDs, never commit)
 data/raw_inspection/
 data/real/
+
+# Attack injection results (may contain project IDs, never commit)
+data/attack_results/
+
+# DB backups
+*.duckdb.pre-attack-backup
