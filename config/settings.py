@@ -63,14 +63,20 @@ class MurmurSettings:
     pattern_weight_rate: float = 0.15
 
     # --- Correlation (Sprint 1) ---
-    # Maps Cloud Run service_name → expected worker SA email (requires GCP_PROJECT_ID)
+    # Maps Cloud Run service_name → expected worker SA email.
+    # Override via SERVICE_WORKER_MAP env var (JSON string) for other GCP projects.
+    # Default uses GCP_PROJECT_ID to construct sandbox SA emails.
     service_worker_map: dict[str, str] = field(default_factory=lambda: (
-        {
-            "normal-worker": f"normal-worker-sa@{pid}.iam.gserviceaccount.com",
-            "maintainer": f"maintenance-sa@{pid}.iam.gserviceaccount.com",
-        }
-        if (pid := os.environ.get("GCP_PROJECT_ID"))
-        else {}
+        json.loads(os.environ["SERVICE_WORKER_MAP"])
+        if "SERVICE_WORKER_MAP" in os.environ
+        else (
+            {
+                "normal-worker": f"normal-worker-sa@{pid}.iam.gserviceaccount.com",
+                "maintainer": f"maintenance-sa@{pid}.iam.gserviceaccount.com",
+            }
+            if (pid := os.environ.get("GCP_PROJECT_ID"))
+            else {}
+        )
     ))
 
     # --- Trigger chain ---

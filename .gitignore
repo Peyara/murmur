@@ -36,3 +36,8 @@ data/attack_results/
 
 # DB backups
 *.duckdb.pre-attack-backup
+
+# Frontend (src/report/frontend/)
+node_modules/
+dist/
+.vite/

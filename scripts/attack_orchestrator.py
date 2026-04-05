@@ -184,9 +184,10 @@ def pipeline(*args, dry_run=False) -> subprocess.CompletedProcess:
     log.info("Pipeline: %s", " ".join(args))
     r = subprocess.run(  # noqa: S603, S607
         cmd, capture_output=True, text=True, timeout=600, cwd=str(PROJECT_ROOT),
+        env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT)},
     )
     if r.returncode != 0:
-        log.warning("Pipeline FAILED: %s", r.stderr.strip()[:200])
+        log.warning("Pipeline FAILED: %s", r.stderr.strip()[:2000])
     elif r.stdout.strip():
         log.info("Pipeline: %s", r.stdout.strip())
     return r
