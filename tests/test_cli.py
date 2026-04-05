@@ -169,9 +169,9 @@ class TestIngestLocalDir:
             }
             for i in range(2)
         ]
-        # Multi-format pipeline expects prefix subdirectories
-        audit_dir = tmp_path / "cloudaudit.googleapis.com"
-        audit_dir.mkdir()
+        # Multi-format pipeline expects prefix subdirectories (per sub-prefix)
+        audit_dir = tmp_path / "cloudaudit.googleapis.com" / "data_access"
+        audit_dir.mkdir(parents=True)
         (audit_dir / "batch.json").write_text("\n".join(json.dumps(e) for e in events))
 
         runner.invoke(cli, ["init-db", "--db-path", tmp_db])
