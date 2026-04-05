@@ -1,3 +1,4 @@
+# ruff: noqa: S607, S603
 #!/usr/bin/env python3
 """Murmur Phase 3: Live Attack Injection Orchestrator.
 
@@ -49,20 +50,17 @@ from config.settings import SETTINGS  # noqa: E402
 # ---------------------------------------------------------------------------
 
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "")
-HUMAN_ACCOUNT = os.environ.get(
-    "MURMUR_HUMAN_ACCOUNT",
-    subprocess.run(["gcloud", "config", "get-value", "account"],
-                   capture_output=True, text=True, timeout=10).stdout.strip(),
-)
+HUMAN_ACCOUNT = os.environ.get("MURMUR_HUMAN_ACCOUNT", "")  # resolved lazily in main()
 GCS_BUCKET = os.environ.get("GCS_AUDIT_BUCKET", "murmur-audit-logs-sandbox")
 EXFIL_BUCKET = os.environ.get("MURMUR_EXFIL_BUCKET", "public-export-sandbox")
 INPUT_BUCKET = os.environ.get("MURMUR_INPUT_BUCKET", "murmur-input-sandbox")
 OUTPUT_BUCKET = os.environ.get("MURMUR_OUTPUT_BUCKET", "murmur-output-sandbox")
 
-NW_SA = f"normal-worker-sa@{PROJECT_ID}.iam.gserviceaccount.com"
-MAINT_SA = f"maintenance-sa@{PROJECT_ID}.iam.gserviceaccount.com"
-SCHED_SA = f"scheduler-sa@{PROJECT_ID}.iam.gserviceaccount.com"
-ATTACKER_SA = f"attacker-sa@{PROJECT_ID}.iam.gserviceaccount.com"
+# SA emails derived from PROJECT_ID — validated in main()
+NW_SA = ""
+MAINT_SA = ""
+SCHED_SA = ""
+ATTACKER_SA = ""
 
 RESULTS_DIR = PROJECT_ROOT / "data" / "attack_results"
 DB_BACKUP_PATH = PROJECT_ROOT / "murmur.duckdb.pre-attack-backup"
@@ -158,7 +156,7 @@ def gcloud(*args, dry_run=False) -> subprocess.CompletedProcess:
         log.info("[DRY-RUN] %s", " ".join(cmd))
         return subprocess.CompletedProcess(cmd, 0, stdout="dry-run", stderr="")
     log.info("Running: %s", " ".join(cmd))
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)  # noqa: S603, S607
     if r.returncode != 0:
         log.warning("FAILED (exit %d): %s", r.returncode, r.stderr.strip()[:200])
     return r
@@ -170,7 +168,9 @@ def gsutil(*args, stdin_data=None, dry_run=False) -> subprocess.CompletedProcess
         log.info("[DRY-RUN] %s", " ".join(cmd))
         return subprocess.CompletedProcess(cmd, 0, stdout="dry-run", stderr="")
     log.info("Running: %s", " ".join(cmd))
-    r = subprocess.run(cmd, input=stdin_data, capture_output=True, text=True, timeout=120)
+    r = subprocess.run(  # noqa: S603, S607
+        cmd, input=stdin_data, capture_output=True, text=True, timeout=120,
+    )
     if r.returncode != 0:
         log.warning("gsutil FAILED (exit %d): %s", r.returncode, r.stderr.strip()[:200])
     return r
@@ -182,7 +182,9 @@ def pipeline(*args, dry_run=False) -> subprocess.CompletedProcess:
         log.info("[DRY-RUN] pipeline: %s", " ".join(cmd))
         return subprocess.CompletedProcess(cmd, 0, stdout="dry-run", stderr="")
     log.info("Pipeline: %s", " ".join(args))
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, cwd=str(PROJECT_ROOT))
+    r = subprocess.run(  # noqa: S603, S607
+        cmd, capture_output=True, text=True, timeout=600, cwd=str(PROJECT_ROOT),
+    )
     if r.returncode != 0:
         log.warning("Pipeline FAILED: %s", r.stderr.strip()[:200])
     elif r.stdout.strip():
@@ -205,9 +207,12 @@ def get_current_sigma() -> float:
 
 
 def get_tier(residual: float) -> str:
-    if residual >= HIGH_T: return "HIGH"
-    if residual >= MED_T: return "MEDIUM"
-    if residual >= WATCH_T: return "WATCH"
+    if residual >= HIGH_T:
+        return "HIGH"
+    elif residual >= MED_T:
+        return "MEDIUM"
+    elif residual >= WATCH_T:
+        return "WATCH"
     return "NORMAL"
 
 
@@ -244,14 +249,18 @@ def ringfence_preflight(dry_run=False):
     log.info("=" * 60)
 
     # Auth
-    acct = subprocess.run(["gcloud", "config", "get-value", "account"],
-                          capture_output=True, text=True, timeout=30).stdout.strip()
+    acct = subprocess.run(  # noqa: S603, S607
+        ["gcloud", "config", "get-value", "account"],
+        capture_output=True, text=True, timeout=30,
+    ).stdout.strip()
     assert acct == HUMAN_ACCOUNT, f"Wrong auth: {acct}"
     log.info("Auth: %s", acct)
 
     # Project
-    proj = subprocess.run(["gcloud", "config", "get-value", "project"],
-                          capture_output=True, text=True, timeout=30).stdout.strip()
+    proj = subprocess.run(  # noqa: S603, S607
+        ["gcloud", "config", "get-value", "project"],
+        capture_output=True, text=True, timeout=30,
+    ).stdout.strip()
     assert proj == PROJECT_ID, f"Wrong project: {proj}"
     log.info("Project: %s", proj)
 
@@ -281,9 +290,11 @@ def ringfence_preflight(dry_run=False):
         log.info("GCP state snapshot saved to %s", pre_dir)
 
     # Git branch
-    branch = subprocess.run(["git", "branch", "--show-current"],
-                            capture_output=True, text=True, timeout=10,
-                            cwd=str(PROJECT_ROOT)).stdout.strip()
+    branch = subprocess.run(  # noqa: S603, S607
+        ["git", "branch", "--show-current"],
+        capture_output=True, text=True, timeout=10,
+        cwd=str(PROJECT_ROOT),
+    ).stdout.strip()
     assert branch != "main", "Must be on feature branch"
     log.info("Git branch: %s", branch)
     log.info("PRE-FLIGHT COMPLETE")
@@ -295,8 +306,10 @@ def ringfence_postflight(dry_run=False):
     log.info("=" * 60)
     warnings = []
 
-    acct = subprocess.run(["gcloud", "config", "get-value", "account"],
-                          capture_output=True, text=True, timeout=30).stdout.strip()
+    acct = subprocess.run(  # noqa: S603, S607
+        ["gcloud", "config", "get-value", "account"],
+        capture_output=True, text=True, timeout=30,
+    ).stdout.strip()
     if acct != HUMAN_ACCOUNT:
         warnings.append(f"Auth: expected {HUMAN_ACCOUNT}, got {acct}")
     else:
@@ -320,7 +333,7 @@ def ringfence_postflight(dry_run=False):
         # Exfil bucket
         r = gsutil("ls", f"gs://{EXFIL_BUCKET}/")
         if r.stdout.strip():
-            warnings.append(f"Exfil bucket not empty")
+            warnings.append("Exfil bucket not empty")
         else:
             log.info("Exfil bucket: empty (OK)")
 
@@ -834,12 +847,18 @@ def generate_report(results: list[AttackResult], baseline: dict, postflight_warn
         lines.append("### Actions\n\n")
         lines.append("| # | Description | Zone | Exit | Duration |\n|---|---|---|---|---|\n")
         for i, a in enumerate(ar.actions):
-            lines.append(f"| {i+1} | {a['description']} | {a['expected_zone']} | {a['exit_code']} | {a['duration_sec']}s |\n")
+            desc = a['description']
+            zone = a['expected_zone']
+            lines.append(f"| {i+1} | {desc} | {zone} | {a['exit_code']} | {a['duration_sec']}s |\n")
 
         if ar.windows:
             lines.append("\n### Scoring Results\n\n")
             for w in ar.windows:
-                lines.append(f"**Window {w['window_start']} — {w['actor_id']}** → **{w['tier']}** (residual={w['residual_risk']:.4f})\n\n")
+                actor = w['actor_id']
+                tier = w['tier']
+                rr = w['residual_risk']
+                lines.append(f"**Window {w['window_start']} — {actor}**"
+                             f" → **{tier}** (residual={rr:.4f})\n\n")
                 lines.append("| Signal | Value |\n|---|---|\n")
                 for sig in ["inv_score", "sigma_coarse", "novelty_score", "bridge_new",
                             "delta_f", "burst_per_min", "breadth_entropy"]:
@@ -854,7 +873,11 @@ def generate_report(results: list[AttackResult], baseline: dict, postflight_warn
         if ar.windows:
             max_rr = max(w.get("residual_risk", 0) for w in ar.windows)
             threshold = baseline.get("validation_2x_threshold", 0)
-            lines.append(f"- Max residual: {max_rr:.4f} (2x threshold: {threshold:.4f}) → {'PASS' if max_rr >= threshold else 'FAIL'}\n")
+            verdict = "PASS" if max_rr >= threshold else "FAIL"
+            lines.append(
+                f"- Max residual: {max_rr:.4f}"
+                f" (2x threshold: {threshold:.4f}) → {verdict}\n"
+            )
             observed_invs = set()
             for w in ar.windows:
                 observed_invs.update(w.get("fired_invariants", []))
@@ -886,9 +909,32 @@ def main():
     args = parser.parse_args()
     dry_run = args.dry_run
 
+    # Resolve globals that depend on runtime state
+    global PROJECT_ID, HUMAN_ACCOUNT, NW_SA, MAINT_SA, SCHED_SA, ATTACKER_SA  # noqa: PLW0603
+
+    if not PROJECT_ID:
+        log.error("GCP_PROJECT_ID env var is required. Set it in .env or export it.")
+        sys.exit(1)
+
+    if not HUMAN_ACCOUNT:
+        result = subprocess.run(  # noqa: S603, S607
+            ["gcloud", "config", "get-value", "account"],
+            capture_output=True, text=True, timeout=10,
+        )
+        HUMAN_ACCOUNT = result.stdout.strip()
+        if not HUMAN_ACCOUNT:
+            log.error("Could not determine human account. Set MURMUR_HUMAN_ACCOUNT env var.")
+            sys.exit(1)
+
+    NW_SA = f"normal-worker-sa@{PROJECT_ID}.iam.gserviceaccount.com"
+    MAINT_SA = f"maintenance-sa@{PROJECT_ID}.iam.gserviceaccount.com"
+    SCHED_SA = f"scheduler-sa@{PROJECT_ID}.iam.gserviceaccount.com"
+    ATTACKER_SA = f"attacker-sa@{PROJECT_ID}.iam.gserviceaccount.com"
+
     log.info("=" * 60)
     log.info("MURMUR PHASE 3: ATTACK INJECTION ORCHESTRATOR")
     log.info("Mode: %s", "DRY-RUN" if dry_run else "LIVE")
+    log.info("Project: %s, Account: %s", PROJECT_ID, HUMAN_ACCOUNT)
     log.info("Architecture: Execute-then-Observe (GCS hourly batching)")
     log.info("=" * 60)
 
