@@ -51,6 +51,8 @@ def create_app(db_path: str | None = None) -> FastAPI:
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Convert from fusion_raw scale (0-10) to residual_risk scale (0-1).
+# Must stay in sync with frontend TIER_THRESHOLDS in lib/constants.ts.
 _THRESHOLDS = {
     "HIGH": SETTINGS.alert_high_threshold / 10.0,
     "MEDIUM": SETTINGS.alert_med_threshold / 10.0,
@@ -306,7 +308,7 @@ def get_actors(
         query += "AND aw.zone_sequence LIKE ? "
         params.append(f'%"{zone}"%')
 
-    query += "ORDER BY rs.residual_risk DESC"
+    query += "ORDER BY rs.residual_risk DESC LIMIT 100"
 
     rows = db.execute(query, params).fetchall()
 
@@ -347,7 +349,8 @@ def get_alerts(
         "JOIN actor_windows aw "
         "  ON rs.window_start = aw.window_start AND rs.actor_id = aw.actor_id "
         "WHERE rs.residual_risk >= ? AND rs.window_start >= ? "
-        "ORDER BY rs.residual_risk DESC, rs.window_start DESC",
+        "ORDER BY rs.residual_risk DESC, rs.window_start DESC "
+        "LIMIT 500",
         [_THRESHOLDS["WATCH"], cutoff],
     ).fetchall()
 
@@ -403,5 +406,11 @@ def get_timeline(
     return TimelineResponse(points=points, hours=hours)
 
 
-# Default app instance (used by uvicorn and CLI serve command)
-app = create_app()
+@_router.get("/windows")
+def get_windows(db: duckdb.DuckDBPyConnection = Depends(get_db)):
+    """Lightweight list of available window timestamps for the scrubber."""
+    rows = db.execute(
+        "SELECT DISTINCT window_start FROM zone_flux_windows ORDER BY window_start"
+    ).fetchall()
+    return {"windows": [r[0].isoformat() for r in rows]}
+

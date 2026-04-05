@@ -13,6 +13,9 @@ export const ZONE_POSITIONS: Record<ZoneName, { x: number; y: number }> = {
   EXFIL_RISK: { x: 0.5, y: 0.92 },
 }
 
+/** Alert tier thresholds on the residual_risk [0,1] scale.
+ *  Source of truth: config/settings.py (alert_high_threshold / 10.0, etc.)
+ *  Must stay in sync with Python _THRESHOLDS in src/report/api.py. */
 export const TIER_THRESHOLDS = {
   HIGH: 0.8,
   MEDIUM: 0.5,

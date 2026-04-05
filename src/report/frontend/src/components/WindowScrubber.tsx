@@ -1,7 +1,8 @@
 /** Time scrubber with playback — replay historical windows at 2s intervals. */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useTimeline } from '../hooks/usePolling'
+import { useQuery } from '@tanstack/react-query'
+import { fetchWindows } from '../api/client'
 import { COLORS } from '../lib/colors'
 
 interface Props {
@@ -10,17 +11,14 @@ interface Props {
 }
 
 export default function WindowScrubber({ onWindowChange, selectedWindow }: Props) {
-  const { data } = useTimeline(720) // 30 days max for scrubbing
+  const { data: windows = [] } = useQuery({
+    queryKey: ['windows'],
+    queryFn: fetchWindows,
+    staleTime: 60_000,
+  })
   const [playing, setPlaying] = useState(false)
   const [index, setIndex] = useState<number | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // Extract unique, sorted windows
-  const windows = (() => {
-    if (!data) return []
-    const set = new Set(data.points.map((p) => p.window_start))
-    return [...set].sort()
-  })()
 
   // Playback loop
   useEffect(() => {

@@ -9,6 +9,16 @@ PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = Path(__file__).parent
 
 
+def _parse_service_worker_map(raw: str) -> dict[str, str]:
+    """Parse and validate SERVICE_WORKER_MAP env var (JSON string -> dict[str, str])."""
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()
+    ):
+        raise ValueError("SERVICE_WORKER_MAP must be a JSON object with string keys and values")
+    return parsed
+
+
 @dataclass
 class MurmurSettings:
     # --- Infrastructure ---
@@ -67,7 +77,7 @@ class MurmurSettings:
     # Override via SERVICE_WORKER_MAP env var (JSON string) for other GCP projects.
     # Default uses GCP_PROJECT_ID to construct sandbox SA emails.
     service_worker_map: dict[str, str] = field(default_factory=lambda: (
-        json.loads(os.environ["SERVICE_WORKER_MAP"])
+        _parse_service_worker_map(os.environ["SERVICE_WORKER_MAP"])
         if "SERVICE_WORKER_MAP" in os.environ
         else (
             {

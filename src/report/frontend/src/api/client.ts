@@ -38,6 +38,13 @@ export function fetchAlerts(hours = 24): Promise<AlertsResponse> {
   return get(`/alerts?hours=${hours}`)
 }
 
+export async function fetchWindows(): Promise<string[]> {
+  const res = await fetch(`${BASE}/windows`)
+  if (!res.ok) throw new Error(`API ${res.status}: /windows`)
+  const data = await res.json() as { windows: string[] }
+  return data.windows
+}
+
 export function fetchTimeline(hours = 24, actor?: string): Promise<TimelineResponse> {
   const p = new URLSearchParams({ hours: String(hours) })
   if (actor) p.set('actor', actor)

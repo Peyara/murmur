@@ -19,5 +19,5 @@ async def lifespan(app: FastAPI):
 
 
 def get_db(request: Request) -> duckdb.DuckDBPyConnection:
-    """FastAPI dependency — returns the shared read-only connection."""
-    return request.app.state.db
+    """FastAPI dependency — returns a cursor for thread-safe concurrent reads."""
+    return request.app.state.db.cursor()

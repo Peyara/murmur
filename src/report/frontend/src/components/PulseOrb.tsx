@@ -102,9 +102,9 @@ export default function PulseOrb({ data, width, height }: Props) {
               sx, sy, tx, ty, cx, cy,
               t: Math.random(), // stagger start positions
               speed: 0.003 + Math.random() * 0.004,
-              color: riskToColor(risk),
-              opacity: risk > 0.1 ? 0.7 + risk * 0.3 : 0.35, // dimmed but visible in calm
-              radius: 2 + risk * 2.5,
+              color: risk > 0.1 ? riskToColor(risk) : COLORS.blue, // benign = bright blue
+              opacity: risk > 0.1 ? 0.7 + risk * 0.3 : 0.6, // benign visible, not ghosted
+              radius: risk > 0.1 ? 2 + risk * 2.5 : 2.5, // benign gets decent size
             })
           }
         }
@@ -136,9 +136,9 @@ export default function PulseOrb({ data, width, height }: Props) {
             cx: mx + offset, cy: my + offset,
             t: Math.random(),
             speed: 0.001 + Math.random() * 0.002,
-            color: COLORS.teal,
-            opacity: 0.25,
-            radius: 1.5,
+            color: COLORS.blue,
+            opacity: 0.5,
+            radius: 2,
           })
         }
       }
