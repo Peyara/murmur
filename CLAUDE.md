@@ -90,6 +90,11 @@ The goal: anyone reading the sprint doc can see exactly where we are, what we've
 - Real GCP project IDs, service account emails, or resource URLs in source code: use env vars via `config/settings.py`
 - If in doubt, check `.gitignore` and run `gitleaks detect` before committing
 
+## GCP Platform Constraints
+
+- **GCS audit log sink exports hourly**, not real-time. Ingestion polling loops must account for 1-2 hour latency. Design pattern: execute actions first, then batch-observe after the hourly boundary.
+- **SA key creation may be blocked** by org policy (`iam.disableServiceAccountKeyCreation`). Use `--impersonate-service-account` as alternative for testing.
+
 ---
 
-*Last updated: 2026-04-01 — v2.0*
+*Last updated: 2026-04-05 — v2.1*
