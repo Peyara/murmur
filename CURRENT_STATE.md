@@ -4,43 +4,40 @@
 
 ## Active Sprint
 
-**Sprint 1B: Signal Validation Gate** — Phase 3 PASS. Attack injection validated.
+**Sprint 1B: Signal Validation Gate** — COMPLETE. All work merged to main.
+**Sprint 2: UI + API** — Not yet started. Needs sprint spec.
 
 ## Last Completed Milestone
 
-Session I (2026-04-03): Live attack injection against GCP sandbox. 4 attack scenarios executed. 3 MEDIUM-tier detections. INV_011 fired on impersonated credential. sigma_coarse spiked 16x. Zero false positives. MVP signal validation gate: PASS.
+Session J (2026-04-05): Signal assessment + weight rebalance + Sprint 1B gate PASS. PR #20 merged. 14/15 gate criteria met. 20.8x attack/normal separation. burst_per_min and breadth_entropy dropped (harmful signals). 395 tests green.
 
 ## GCP Sandbox Status
 
-- Cloud Run `normal-worker` + `maintainer`: active, generating benign baseline
-- Live DB: `murmur.duckdb` — 18,792 events, 834 windows, 1,244 scored pairs
-- Data through: 2026-04-03 22:55 UTC
-- Feature branch: `feature/live-attack-injection` (uncommitted changes)
+- Cloud Run `normal-worker` + `maintainer`: active, generating baseline
+- Live DB: `murmur.duckdb` — 21,837 events, 994 windows, 1,487 scored pairs
+- Data through: 2026-04-05 14:55 UTC
+- Tier distribution: HIGH 1, MEDIUM 7, WATCH 7, NORMAL 1,472
 
 ## Open Blockers / Questions
 
-1. **Feature branch needs commit + PR** — checkpoint fix, orchestrator, plan doc, .gitignore update, test fix
-2. **Attack D partial** — IAM grant detected but impersonated secret access failed (propagation delay). Retry or accept.
-3. **23:00 UTC hour blob** — may contain additional events from cleanup/late propagation. Ingest next session.
-4. **Slow ratchet cross-window analysis** — Attacks A/B/C landed in overlapping window (21:15). Analyze each window independently.
-5. **CLI subprocess ingest bug** — orchestrator's `python -m src.cli` subprocess didn't ingest events. Direct import works. Debug for future runs.
-6. **Cleanup verification** — confirm attacker-sa deleted, IAM bindings revoked, exfil bucket empty.
-7. **burst_per_min redesign** — B+C approach designed, parked for post-MVP.
+1. **Sprint 2 spec needed** — UI + API layer (FastAPI + React + D3.js). No spec written yet.
+2. **Attack D partial** — IAM grant detected but impersonated access failed (propagation). Accept or retry.
+3. **Slow ratchet cross-window analysis** — Attack C windows overlapped with A/B. Independent analysis needed.
+4. **CLI subprocess ingest bug** — orchestrator `python -m src.cli` subprocess didn't ingest. Direct import works.
+5. **Physics experiment** — proposal at `docs/rd_reports/physics_signal_experiment_proposal.md`. When to run?
+6. **Post-MVP ML roadmap** — Level 2 (per-actor profiles) is the priority. Needs data + design.
 
 ## Files to Read for Context
 
-- **Phase 3 plan:** `docs/phase3_attack_injection_plan.md`
 - **Sprint 1 spec:** `docs/sprints/sprint_01_core_detection.md`
-- **Session I learnings:** `LEARNINGS.md` (top entry)
-- **Baseline snapshot:** `data/attack_results/baseline_snapshot.json`
-- **Execution log:** `data/attack_results/phase3_execution.log`
-- **Orchestrator:** `scripts/attack_orchestrator.py`
+- **Phase 3 plan:** `docs/phase3_attack_injection_plan.md`
+- **Physics experiment:** `docs/rd_reports/physics_signal_experiment_proposal.md`
+- **Session J learnings:** `LEARNINGS.md` (top entry)
+- **Fusion weights:** `src/score/fusion.py` (5 active signals, 2 zeroed)
+- **Post-MVP roadmap:** `docs/post_mvp_roadmap.md`
 
 ## What To Do Next
 
-1. **Commit + PR** for feature/live-attack-injection branch (checkpoint fix, orchestrator, plan doc)
-2. **Verify cleanup** — check attacker-sa, IAM bindings, exfil bucket state
-3. **Ingest 23:00 UTC hour** — pull latest GCS data, check for remaining attack events
-4. **Deep analysis** of attack results — per-window signal decomposition, slow ratchet trajectory
-5. **Write Phase 3 R&D report** — `docs/rd_reports/` with full findings, signal validation summary
-6. **Sprint 2 planning** — UI + API layer, now that signal validation is complete
+1. **Write Sprint 2 spec** — FastAPI API + React+D3 dashboard. Define endpoints, components, gate criteria.
+2. **Decide on physics experiment timing** — before Sprint 2 or deferred?
+3. **Start Sprint 2 implementation** — API layer first, then frontend.
