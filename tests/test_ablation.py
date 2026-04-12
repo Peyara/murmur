@@ -1,6 +1,5 @@
 """Tests for closure signal ablation study."""
 
-import pytest
 
 from src.score.ablation import (
     AblationResult,

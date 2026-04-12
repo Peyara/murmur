@@ -2,8 +2,8 @@
 
 from datetime import datetime, timedelta
 
-from src.schema import ActionType, TargetType, TargetZone
 from src.ingest.dedup import insert_event
+from src.schema import ActionType, TargetType, TargetZone
 from tests.conftest import make_event
 
 W1 = datetime(2026, 3, 25, 10, 0, 0)
@@ -97,7 +97,7 @@ class TestMineCandidates:
 class TestPromoteCandidates:
     def test_promotes_qualified_candidates(self, db):
         """Candidates with enough observations get inserted into opening_closing_pairs."""
-        from src.score.closure import seed_pairs, mine_candidate_pairs, promote_candidates
+        from src.score.closure import mine_candidate_pairs, promote_candidates, seed_pairs
 
         seed_pairs(db)
         _create_open_close_sequence(
@@ -117,7 +117,7 @@ class TestPromoteCandidates:
 
     def test_does_not_promote_below_threshold(self, db):
         """Candidates below min_observations stay as candidates."""
-        from src.score.closure import seed_pairs, mine_candidate_pairs, promote_candidates
+        from src.score.closure import mine_candidate_pairs, promote_candidates, seed_pairs
 
         seed_pairs(db)
         _create_open_close_sequence(
@@ -133,7 +133,13 @@ class TestPromoteCandidates:
 class TestDiscoveryOnlyCloses:
     def test_discovered_pair_closes_watch(self, db):
         """A promoted discovered pair can close an existing watch."""
-        from src.score.closure import seed_pairs, create_watch, try_close_watch, mine_candidate_pairs, promote_candidates
+        from src.score.closure import (
+            create_watch,
+            mine_candidate_pairs,
+            promote_candidates,
+            seed_pairs,
+            try_close_watch,
+        )
 
         seed_pairs(db)
 
@@ -171,8 +177,8 @@ class TestDiscoveryOnlyCloses:
 
     def test_discovery_never_creates_new_opening_type(self, db):
         """Discovery only adds closing types to pairs table, never new opening types."""
-        from src.score.closure import seed_pairs, mine_candidate_pairs, promote_candidates
         from config.settings import SETTINGS
+        from src.score.closure import mine_candidate_pairs, promote_candidates, seed_pairs
 
         config = SETTINGS.closure
         seed_pairs(db, config)
