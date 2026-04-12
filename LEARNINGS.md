@@ -6,6 +6,39 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-12 — Production — Session M: Autonomous mode failsafes + hook-enforced safety
+
+**Session Summary**
+- Mode: Production
+- Continuation of Session L (same day). Added hardcoded failsafes to Autonomous mode spec.
+- PR #5 to peyara-standards: PreToolUse hooks blocking push-to-main and `gh pr merge`, failsafes documented in spec
+- Fixed install.sh settings merge — jq merge-by-matcher preserves existing user hooks instead of overwriting
+- Ran install.sh to deploy hooks to live ~/.claude/settings.json
+- Also installed new commands from remote: architect, cleanup-pass, search-first, tdd-guide, verification-loop
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Hook-enforced failsafes | Instruction-only enforcement | Instructions can be missed. Hooks are mechanical. |
+| jq merge-by-matcher for install.sh | Simple deep merge (`.[0] * .[1]`) | Overwrites hook arrays — destroys user's custom hooks (e.g. secrets scanner). |
+
+**Exceptions**
+- "One feature per session" — two PRs in one session (#4 + #5). Natural continuation, not feature bundling. One-off.
+
+**Open Questions**
+1. Autonomous mode untested — first real session will surface gaps
+2. Scope boundary enforcement is instruction-based only
+3. Orchestrator pattern (lead agent assigning task specs) undefined
+4. peyara-standards new commands/files from remote — installed but not reviewed
+5. install.sh merge idempotency — repeated runs will duplicate hooks within same matcher
+
+**Evolution Candidates**
+- install.sh merge idempotency — promote (bug fix needed before next install)
+- Cross-project infrastructure sessions — watch (recurring pattern from Session L)
+
+---
+
 ### 2026-04-12 — Production — Session L: Autonomous mode added to Peyara standards
 
 **Session Summary**
