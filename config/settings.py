@@ -1,5 +1,7 @@
 """Centralized configuration for all Murmur parameters."""
 
+from __future__ import annotations
+
 import json
 import os
 from dataclasses import dataclass, field
@@ -79,7 +81,7 @@ class MurmurSettings:
     # --- Closure (Sprint 3) ---
     # Platform-specific closure config. GCP defaults below.
     # To support a new platform, replace this with that platform's ClosureConfig.
-    closure: "ClosureConfig" = field(default_factory=lambda: _gcp_closure_config())
+    closure: ClosureConfig = field(default_factory=lambda: _gcp_closure_config())  # noqa: F821
 
     def load_known_initiators(self) -> set[str]:
         """Load known initiator SA emails. Resolves PROJECT_NUMBER placeholder from env."""
@@ -102,7 +104,7 @@ class MurmurSettings:
         return resolved
 
 
-def _gcp_closure_config() -> "ClosureConfig":
+def _gcp_closure_config() -> ClosureConfig:  # noqa: F821
     """GCP-specific closure configuration. The only platform-specific code."""
     from src.score.closure import ClosureConfig
 
