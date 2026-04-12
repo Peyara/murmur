@@ -377,3 +377,32 @@ def generate(actors: int, windows: int, attack_ratio: float, seed: int, output: 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+
+@cli.command("ablate")
+@click.option("--db-path", default=None, help="Path to DuckDB file.")
+@click.option("--output", default="docs/rd_reports/closure_ablation.md", help="Output report path.")
+def ablate(db_path: str | None, output: str):
+    """Run closure signal ablation study (read-only)."""
+    from src.score.ablation import capture_baseline, generate_report, run_ablation
+
+    db_path = db_path or SETTINGS.db_path
+    click.echo(f"Reading baseline from {db_path}...")
+    baseline = capture_baseline(db_path)
+    click.echo(f"  {len(baseline)} scored pairs loaded.")
+
+    closure_signals = ["closure_gap", "orphaned_priv"]
+
+    click.echo("Running zero ablation...")
+    zero_result = run_ablation(baseline, closure_signals, mode="zero")
+    click.echo(f"  {sum(1 for _, _, o, n in zero_result.rows if o != n)} tier changes.")
+
+    click.echo("Running redistribute ablation...")
+    redist_result = run_ablation(baseline, closure_signals, mode="redistribute")
+    click.echo(f"  {sum(1 for _, _, o, n in redist_result.rows if o != n)} tier changes.")
+
+    report = generate_report(baseline, zero_result, redist_result, db_path)
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report)
+    click.echo(f"Report written to {output_path}")
