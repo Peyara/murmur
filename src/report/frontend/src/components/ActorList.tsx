@@ -30,7 +30,8 @@ export default function ActorList({ actors }: Props) {
     <div className="absolute top-6 left-6">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="text-xs text-murmur-slate hover:text-murmur-teal transition-colors"
+        className="text-xs transition-colors"
+        style={{ color: '#64748b' }}
       >
         {expanded ? 'Hide' : `${actors.length} actors`}
       </button>
@@ -43,10 +44,11 @@ export default function ActorList({ actors }: Props) {
             return (
               <div
                 key={actor.actor_id}
-                className="flex items-center gap-2 text-xs bg-murmur-navy/80 rounded px-2 py-1"
+                className="flex items-center gap-2 text-xs rounded-lg border px-2 py-1.5 bg-white/90"
+                style={{ borderColor: '#e5e7eb' }}
               >
                 {/* Risk bar */}
-                <div className="w-16 h-1.5 bg-murmur-steel rounded-full overflow-hidden">
+                <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#e5e7eb' }}>
                   <div
                     className="h-full rounded-full"
                     style={{
@@ -57,7 +59,7 @@ export default function ActorList({ actors }: Props) {
                 </div>
 
                 {/* Actor name */}
-                <span className="text-murmur-slate truncate flex-1">
+                <span className="truncate flex-1" style={{ color: '#334155' }}>
                   {shortActor(actor.actor_id)}
                 </span>
 

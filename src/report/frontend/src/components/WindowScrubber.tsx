@@ -55,8 +55,11 @@ export default function WindowScrubber({ onWindowChange, selectedWindow }: Props
     if (playing) {
       setPlaying(false)
     } else {
-      // Start from current position, or beginning if at the end
-      const startIdx = (index !== null && index < windows.length - 1) ? index : 0
+      // Start from current position. If at LIVE (end), start from ~80% through
+      // so the user sees the interesting recent history, not ancient calm data
+      const startIdx = (index !== null && index < windows.length - 1)
+        ? index
+        : Math.max(0, Math.floor(windows.length * 0.8))
       setIndex(startIdx)
       onWindowChange(windows[startIdx])
       setPlaying(true)
@@ -76,49 +79,50 @@ export default function WindowScrubber({ onWindowChange, selectedWindow }: Props
   const isLive = !selectedWindow
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 px-6 py-3 bg-murmur-navy/80 border-t border-murmur-steel/30">
-      <div className="flex items-center gap-3 max-w-4xl mx-auto">
-        {/* Play/Stop */}
-        <button
-          onClick={togglePlay}
-          className="text-xs font-medium px-2 py-1 rounded transition-colors"
-          style={{
-            backgroundColor: playing ? COLORS.coral + '33' : COLORS.teal + '22',
-            color: playing ? COLORS.coral : COLORS.teal,
-          }}
-        >
-          {playing ? 'STOP' : 'PLAY'}
-        </button>
+    <div className="flex items-center gap-3 max-w-4xl mx-auto">
+      {/* Play/Stop */}
+      <button
+        onClick={togglePlay}
+        className="text-xs font-medium px-3 py-1.5 rounded-md border transition-colors"
+        style={{
+          borderColor: playing ? '#e85d5d44' : '#e5e7eb',
+          backgroundColor: playing ? '#e85d5d11' : 'white',
+          color: playing ? COLORS.coral : '#64748b',
+        }}
+      >
+        {playing ? 'Stop' : 'Play'}
+      </button>
 
-        {/* Slider */}
-        <input
-          type="range"
-          min={0}
-          max={windows.length - 1}
-          value={currentIdx}
-          onChange={handleSlider}
-          className="flex-1 h-1 accent-murmur-teal cursor-pointer"
-        />
+      {/* Slider */}
+      <input
+        type="range"
+        min={0}
+        max={windows.length - 1}
+        value={currentIdx}
+        onChange={handleSlider}
+        className="flex-1 h-1 cursor-pointer"
+        style={{ accentColor: '#2a8a7a' }}
+      />
 
-        {/* Live button */}
-        <button
-          onClick={handleLive}
-          className={`text-xs px-2 py-1 rounded transition-colors ${
-            isLive
-              ? 'bg-murmur-teal/20 text-murmur-teal'
-              : 'text-murmur-slate hover:text-white'
-          }`}
-        >
-          LIVE
-        </button>
+      {/* Live button */}
+      <button
+        onClick={handleLive}
+        className="text-xs font-medium px-3 py-1.5 rounded-md border transition-colors"
+        style={{
+          borderColor: isLive ? '#2a8a7a44' : '#e5e7eb',
+          backgroundColor: isLive ? '#2a8a7a11' : 'white',
+          color: isLive ? COLORS.teal : '#64748b',
+        }}
+      >
+        Live
+      </button>
 
-        {/* Timestamp */}
-        <span className="text-[10px] text-murmur-slate min-w-[140px] text-right">
-          {currentWindow
-            ? new Date(currentWindow).toLocaleString()
-            : 'Latest'}
-        </span>
-      </div>
+      {/* Timestamp */}
+      <span className="text-[11px] min-w-[150px] text-right" style={{ color: '#94a3b8' }}>
+        {currentWindow
+          ? new Date(currentWindow).toLocaleString()
+          : 'Latest'}
+      </span>
     </div>
   )
 }

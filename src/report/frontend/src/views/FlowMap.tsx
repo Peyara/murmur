@@ -147,7 +147,7 @@ export default function FlowMap({ selectedWindow }: Props) {
               {/* Main circle */}
               <circle
                 cx={pos.x * W} cy={pos.y * H} r={r}
-                fill={COLORS.navy}
+                fill="white"
                 stroke={isSelected ? COLORS.teal : color}
                 strokeWidth={isSelected ? 2.5 : 1.5}
               />
@@ -156,7 +156,7 @@ export default function FlowMap({ selectedWindow }: Props) {
               <text
                 x={pos.x * W} y={pos.y * H - 4}
                 textAnchor="middle"
-                fill={isElevated ? color : '#e2e8f0'}
+                fill={isElevated ? color : '#334155'}
                 fontSize={11}
                 fontWeight={500}
                 fontFamily="Inter, sans-serif"

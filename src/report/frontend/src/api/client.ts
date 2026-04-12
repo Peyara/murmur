@@ -6,6 +6,7 @@ import type {
   ActorsResponse,
   AlertsResponse,
   TimelineResponse,
+  WaterfallResponse,
 } from './types'
 
 const BASE = '/api'
@@ -43,6 +44,14 @@ export async function fetchWindows(): Promise<string[]> {
   if (!res.ok) throw new Error(`API ${res.status}: /windows`)
   const data = await res.json() as { windows: string[] }
   return data.windows
+}
+
+export function fetchWaterfall(window?: string, zone?: string): Promise<WaterfallResponse> {
+  const p = new URLSearchParams()
+  if (window) p.set('window', window)
+  if (zone) p.set('zone', zone)
+  const qs = p.toString()
+  return get(`/waterfall${qs ? `?${qs}` : ''}`)
 }
 
 export function fetchTimeline(hours = 24, actor?: string): Promise<TimelineResponse> {

@@ -1,12 +1,8 @@
 import { useState, useCallback } from 'react'
-import Pulse from './views/Pulse'
-import FlowMap from './views/FlowMap'
+import MeshView from './views/MeshView'
 import WindowScrubber from './components/WindowScrubber'
 
-type View = 'pulse' | 'flowmap'
-
 export default function App() {
-  const [view, setView] = useState<View>('pulse')
   const [selectedWindow, setSelectedWindow] = useState<string | undefined>(undefined)
 
   const handleWindowChange = useCallback((w: string | undefined) => {
@@ -14,40 +10,29 @@ export default function App() {
   }, [])
 
   return (
-    <div className="w-full h-full flex flex-col bg-murmur-bg">
-      {/* Minimal nav */}
-      <nav className="flex gap-4 px-6 py-3 opacity-70 hover:opacity-100 transition-opacity z-10">
-        <button
-          onClick={() => setView('pulse')}
-          className={`text-sm font-medium tracking-wide ${
-            view === 'pulse' ? 'text-murmur-teal' : 'text-murmur-slate'
-          }`}
-        >
-          PULSE
-        </button>
-        <button
-          onClick={() => setView('flowmap')}
-          className={`text-sm font-medium tracking-wide ${
-            view === 'flowmap' ? 'text-murmur-teal' : 'text-murmur-slate'
-          }`}
-        >
-          FLOW MAP
-        </button>
+    <div className="w-full h-full flex flex-col" style={{ backgroundColor: '#f8f9fb' }}>
+      {/* Light nav bar */}
+      <nav
+        className="flex items-center px-8 py-4 border-b"
+        style={{ borderColor: '#e5e7eb' }}
+      >
+        <span className="text-sm font-semibold tracking-widest" style={{ color: '#94a3b8' }}>
+          MURMUR
+        </span>
       </nav>
 
-      {/* View */}
-      <main className="flex-1 relative pb-12">
-        {view === 'pulse'
-          ? <Pulse selectedWindow={selectedWindow} />
-          : <FlowMap selectedWindow={selectedWindow} />
-        }
+      {/* Mesh visualization */}
+      <main className="flex-1 relative overflow-hidden">
+        <MeshView selectedWindow={selectedWindow} />
       </main>
 
       {/* Window scrubber */}
-      <WindowScrubber
-        selectedWindow={selectedWindow}
-        onWindowChange={handleWindowChange}
-      />
+      <div className="px-6 pb-3 pt-2 border-t" style={{ borderColor: '#e5e7eb' }}>
+        <WindowScrubber
+          selectedWindow={selectedWindow}
+          onWindowChange={handleWindowChange}
+        />
+      </div>
     </div>
   )
 }

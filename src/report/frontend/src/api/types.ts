@@ -47,6 +47,9 @@ export interface ZoneConnection {
   flux: number
   actors: string[]
   has_new_edge: boolean
+  authorized: boolean
+  provenance_level: string
+  pattern_match_avg: number
 }
 
 export interface ZonesResponse {
@@ -112,4 +115,30 @@ export interface TimelinePoint {
 export interface TimelineResponse {
   points: TimelinePoint[]
   hours: number
+}
+
+export interface WaterfallEvent {
+  event_id: string
+  ts: string
+  actor_id: string
+  action_type: string
+  target_zone: string
+  target_id: string
+  trigger_ref: string | null
+  provenance_level: string
+  provenance_source: string
+}
+
+export interface WaterfallLane {
+  actor_id: string
+  provenance_level: string
+  pattern_match_score: number
+  residual_risk: number
+  fired_invariants: string[]
+  events: WaterfallEvent[]
+}
+
+export interface WaterfallResponse {
+  window_start: string | null
+  lanes: WaterfallLane[]
 }

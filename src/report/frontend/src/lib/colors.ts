@@ -11,19 +11,19 @@ import { interpolateRgb } from 'd3'
 import { TIER_THRESHOLDS } from './constants'
 import type { AlertTier } from '../api/types'
 
-// Palette
+// Palette — tuned for light background
 export const COLORS = {
-  bg: '#0a0e17',
+  bg: '#f8f9fb',
   navy: '#0d1b2a',
-  steel: '#1b2838',
-  slate: '#2a3a4a',
-  teal: '#2a8a7a',
-  blue: '#4a9aca',
-  blueSoft: '#1a3a5c',
-  amber: '#d4a574',
-  copper: '#c47a4a',
-  coral: '#e85d5d',
-  red: '#ff4444',
+  steel: '#e2e5ea',
+  slate: '#94a3b8',
+  teal: '#0d9488',
+  blue: '#3b82f6',
+  blueSoft: '#93c5fd',
+  amber: '#d97706',
+  copper: '#c2410c',
+  coral: '#dc2626',
+  red: '#b91c1c',
 } as const
 
 // Tier -> color
@@ -34,13 +34,13 @@ export const TIER_COLORS: Record<AlertTier, string> = {
   HIGH: COLORS.coral,
 }
 
-// Continuous risk -> color interpolation
+// Continuous risk -> color interpolation (saturated for light bg)
 const riskScale = [
-  { t: 0, color: COLORS.teal },
-  { t: TIER_THRESHOLDS.WATCH, color: COLORS.amber },
-  { t: TIER_THRESHOLDS.MEDIUM, color: COLORS.copper },
-  { t: TIER_THRESHOLDS.HIGH, color: COLORS.coral },
-  { t: 1.0, color: COLORS.red },
+  { t: 0, color: '#3b82f6' },        // calm blue
+  { t: TIER_THRESHOLDS.WATCH, color: '#d97706' },  // amber
+  { t: TIER_THRESHOLDS.MEDIUM, color: '#ea580c' },  // deep orange
+  { t: TIER_THRESHOLDS.HIGH, color: '#dc2626' },    // red
+  { t: 1.0, color: '#991b1b' },       // dark red
 ]
 
 export function riskToColor(risk: number): string {

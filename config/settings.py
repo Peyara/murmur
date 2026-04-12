@@ -5,8 +5,13 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = Path(__file__).parent
+
+# Auto-load .env so GCP_PROJECT_ID, GCS_AUDIT_BUCKET, etc. are always available.
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 
 def _parse_service_worker_map(raw: str) -> dict[str, str]:

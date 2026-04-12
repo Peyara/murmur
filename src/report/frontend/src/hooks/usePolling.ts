@@ -10,6 +10,7 @@ export function usePulse(window?: string) {
     queryKey: ['pulse', window],
     queryFn: () => fetchPulse(window),
     refetchInterval: window ? false : POLL_INTERVAL,
+    staleTime: 0, // always refetch when window changes — prevents flash of cached attack data
   })
 }
 
@@ -18,6 +19,7 @@ export function useZones(window?: string) {
     queryKey: ['zones', window],
     queryFn: () => fetchZones(window),
     refetchInterval: window ? false : POLL_INTERVAL,
+    staleTime: 0,
   })
 }
 

@@ -259,6 +259,77 @@ class TestTimeline:
         assert data["hours"] == 48
 
 
+class TestZonesProvenance:
+    """Zones endpoint returns authorization context on connections."""
+
+    def test_connections_have_auth_fields(self, client):
+        data = client.get("/api/zones").json()
+        for conn in data["connections"]:
+            assert "authorized" in conn
+            assert "provenance_level" in conn
+            assert "pattern_match_avg" in conn
+
+    def test_attacker_connection_unauthorized(self, client):
+        data = client.get("/api/zones").json()
+        identity_secret = [
+            c for c in data["connections"]
+            if c["source"] == "IDENTITY" and c["target"] == "SECRET"
+        ]
+        assert len(identity_secret) == 1
+        # Attacker has provenance=NONE → not authorized
+        assert identity_secret[0]["authorized"] is False
+        assert identity_secret[0]["provenance_level"] == "NONE"
+
+    def test_normal_connection_authorized(self, client):
+        data = client.get("/api/zones").json()
+        data_data = [
+            c for c in data["connections"]
+            if c["source"] == "DATA" and c["target"] == "DATA"
+        ]
+        # Normal-sa has provenance=WEAK
+        if data_data:
+            assert data_data[0]["provenance_level"] in ("WEAK", "STRONG")
+
+
+class TestWaterfall:
+    def test_returns_200(self, client):
+        r = client.get("/api/waterfall")
+        assert r.status_code == 200
+
+    def test_has_lanes(self, client):
+        data = client.get("/api/waterfall").json()
+        assert len(data["lanes"]) >= 1
+
+    def test_lane_has_events(self, client):
+        data = client.get("/api/waterfall").json()
+        for lane in data["lanes"]:
+            assert len(lane["events"]) >= 1
+            assert "provenance_level" in lane
+            assert "residual_risk" in lane
+
+    def test_events_have_provenance(self, client):
+        data = client.get("/api/waterfall").json()
+        for lane in data["lanes"]:
+            for event in lane["events"]:
+                assert "trigger_ref" in event
+                assert "provenance_level" in event
+                assert "action_type" in event
+
+    def test_waterfall_empty(self):
+        """Empty DB returns empty lanes."""
+        conn = duckdb.connect(":memory:")
+        with open(SCHEMA_PATH) as f:
+            conn.execute(f.read())
+        app = FastAPI()
+        app.include_router(_router)
+        app.dependency_overrides[get_db] = lambda: conn
+        c = TestClient(app)
+        r = c.get("/api/waterfall")
+        assert r.status_code == 200
+        assert r.json()["lanes"] == []
+        conn.close()
+
+
 class TestEmptyDB:
     """Endpoints should handle an empty database gracefully."""
 

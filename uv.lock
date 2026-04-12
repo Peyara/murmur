@@ -587,6 +587,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "google-cloud-storage" },
     { name = "numpy" },
+    { name = "python-dotenv" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -605,6 +606,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "google-cloud-storage", specifier = ">=2.14" },
     { name = "numpy", specifier = ">=1.26" },
+    { name = "python-dotenv", specifier = ">=1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
 ]
 

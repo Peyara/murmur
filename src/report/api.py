@@ -25,6 +25,9 @@ from src.report.models import (
     TimelinePoint,
     TimelineResponse,
     TrendPoint,
+    WaterfallEvent,
+    WaterfallLane,
+    WaterfallResponse,
     ZoneConnection,
     ZoneNode,
     ZonesResponse,
@@ -248,22 +251,33 @@ def get_zones(
         for z in ZONE_ORDER
     ]
 
-    # Connections — aggregate edges_window by (source, target)
+    # Connections — aggregate edges with provenance context from actor_windows
     edge_rows = db.execute(
-        "SELECT source_zone, target_zone, "
-        "  LIST(DISTINCT actor_id) as actors, "
-        "  SUM(edge_count) as total_flow, "
-        "  MAX(is_new_30d::INT) as has_new "
-        "FROM edges_window WHERE window_start = ? "
-        "GROUP BY source_zone, target_zone",
+        "SELECT ew.source_zone, ew.target_zone, "
+        "  LIST(DISTINCT ew.actor_id) as actors, "
+        "  SUM(ew.edge_count) as total_flow, "
+        "  MAX(ew.is_new_30d::INT) as has_new, "
+        "  MIN(CASE WHEN aw.provenance_level = 'NONE' THEN 0 ELSE 1 END) as all_authorized, "
+        "  MAX(CASE WHEN aw.provenance_level = 'STRONG' THEN 2 "
+        "           WHEN aw.provenance_level = 'WEAK' THEN 1 ELSE 0 END) as best_prov, "
+        "  COALESCE(AVG(aw.pattern_match_score), 0) as avg_pattern "
+        "FROM edges_window ew "
+        "LEFT JOIN actor_windows aw "
+        "  ON ew.window_start = aw.window_start AND ew.actor_id = aw.actor_id "
+        "WHERE ew.window_start = ? "
+        "GROUP BY ew.source_zone, ew.target_zone",
         [window],
     ).fetchall()
 
+    prov_labels = {0: "NONE", 1: "WEAK", 2: "STRONG"}
     connections = [
         ZoneConnection(
             source=r[0], target=r[1],
             flux=float(r[3]), actors=r[2],
             has_new_edge=bool(r[4]),
+            authorized=bool(r[5]),
+            provenance_level=prov_labels.get(r[6], "NONE"),
+            pattern_match_avg=float(r[7]),
         )
         for r in edge_rows
     ]
@@ -413,4 +427,76 @@ def get_windows(db: duckdb.DuckDBPyConnection = Depends(get_db)):
         "SELECT DISTINCT window_start FROM zone_flux_windows ORDER BY window_start"
     ).fetchall()
     return {"windows": [r[0].isoformat() for r in rows]}
+
+
+@_router.get("/waterfall", response_model=WaterfallResponse)
+def get_waterfall(
+    window: datetime | None = Query(None, description="Window timestamp; defaults to latest"),
+    zone: str | None = Query(None, description="Filter by zone"),
+    db: duckdb.DuckDBPyConnection = Depends(get_db),
+):
+    """Actor swim lanes with event chains for the waterfall panel."""
+
+    # Resolve window
+    if window is None:
+        row = db.execute(
+            "SELECT MAX(window_start) FROM risk_scores"
+        ).fetchone()
+        if row is None or row[0] is None:
+            return WaterfallResponse(window_start=None, lanes=[])
+        window = row[0]
+
+    # Get scored actors for this window
+    actor_rows = db.execute(
+        "SELECT rs.actor_id, aw.provenance_level, aw.pattern_match_score, "
+        "  rs.residual_risk, rs.fired_invariants "
+        "FROM risk_scores rs "
+        "JOIN actor_windows aw "
+        "  ON rs.window_start = aw.window_start AND rs.actor_id = aw.actor_id "
+        "WHERE rs.window_start = ? "
+        "ORDER BY rs.residual_risk DESC LIMIT 20",
+        [window],
+    ).fetchall()
+
+    lanes = []
+    for actor_row in actor_rows:
+        actor_id = actor_row[0]
+
+        # Get events for this actor in this window
+        query = (
+            "SELECT event_id, ts, actor_id, action_type, target_zone, target_id, "
+            "  trigger_ref, provenance_level, provenance_source "
+            "FROM events WHERE window_start = ? AND actor_id = ? "
+        )
+        params: list = [window, actor_id]
+
+        if zone:
+            query += "AND target_zone = ? "
+            params.append(zone)
+
+        query += "ORDER BY ts LIMIT 50"
+
+        event_rows = db.execute(query, params).fetchall()
+
+        events = [
+            WaterfallEvent(
+                event_id=r[0], ts=r[1], actor_id=r[2],
+                action_type=r[3], target_zone=r[4], target_id=r[5],
+                trigger_ref=r[6], provenance_level=r[7] or "NONE",
+                provenance_source=r[8] or "UNKNOWN",
+            )
+            for r in event_rows
+        ]
+
+        if events:
+            lanes.append(WaterfallLane(
+                actor_id=actor_id,
+                provenance_level=actor_row[1] or "NONE",
+                pattern_match_score=float(actor_row[2]),
+                residual_risk=float(actor_row[3]),
+                fired_invariants=_parse_json(actor_row[4]),
+                events=events,
+            ))
+
+    return WaterfallResponse(window_start=window, lanes=lanes)
 

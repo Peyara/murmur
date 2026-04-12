@@ -21,24 +21,24 @@ export default function ConnectionDetail({ connection, onClose }: Props) {
   }, [onClose])
 
   return (
-    <div className="absolute right-0 top-0 h-full w-72 bg-murmur-navy/95 border-l border-murmur-steel overflow-y-auto">
+    <div className="absolute right-0 top-0 h-full w-72 bg-white/95 border-l overflow-y-auto shadow-lg" style={{ borderColor: '#e5e7eb' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-murmur-steel">
-        <h3 className="text-sm font-medium">
-          <span className="text-murmur-teal">{connection.source}</span>
-          <span className="text-murmur-slate mx-1">&rarr;</span>
-          <span className="text-murmur-teal">{connection.target}</span>
+      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: '#e5e7eb' }}>
+        <h3 className="text-sm font-semibold">
+          <span style={{ color: '#0d9488' }}>{connection.source}</span>
+          <span className="mx-1" style={{ color: '#94a3b8' }}>&rarr;</span>
+          <span style={{ color: '#0d9488' }}>{connection.target}</span>
         </h3>
-        <button onClick={onClose} className="text-murmur-slate hover:text-white text-xs">
+        <button onClick={onClose} className="text-xs" style={{ color: '#94a3b8' }}>
           ESC
         </button>
       </div>
 
       {/* Summary */}
-      <div className="px-4 py-3 border-b border-murmur-steel/50 text-xs text-murmur-slate">
-        <span>flux: <span className="text-white">{connection.flux.toFixed(1)}</span></span>
+      <div className="px-4 py-3 border-b text-xs" style={{ borderColor: '#f0f0f0', color: '#64748b' }}>
+        <span>flux: <span style={{ color: '#1a1a2e' }}>{connection.flux.toFixed(1)}</span></span>
         {connection.has_new_edge && (
-          <span className="ml-3 text-murmur-coral">novel edge</span>
+          <span className="ml-3" style={{ color: COLORS.coral }}>novel edge</span>
         )}
       </div>
 
@@ -47,13 +47,14 @@ export default function ConnectionDetail({ connection, onClose }: Props) {
         {connection.actors.map((actorId) => (
           <div
             key={actorId}
-            className="flex items-center gap-2 bg-murmur-steel/30 rounded px-3 py-2"
+            className="flex items-center gap-2 rounded-lg border px-3 py-2"
+            style={{ borderColor: '#f0f0f0', backgroundColor: '#fafafa' }}
           >
             <div
               className="w-2 h-2 rounded-full"
               style={{ backgroundColor: COLORS.teal }}
             />
-            <span className="text-xs text-white truncate">
+            <span className="text-xs truncate" style={{ color: '#1a1a2e' }}>
               {shortActor(actorId)}
             </span>
           </div>

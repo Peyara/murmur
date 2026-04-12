@@ -58,12 +58,6 @@ export default function Pulse({ selectedWindow }: Props) {
         <TrendSpark trend={data.trend} maxRisk={data.max_residual} />
       </div>
 
-      {/* Time-lapse indicator */}
-      {selectedWindow && (
-        <div className="absolute top-6 right-6 text-xs text-murmur-amber opacity-80">
-          REPLAY MODE
-        </div>
-      )}
     </div>
   )
 }

@@ -69,6 +69,9 @@ class ZoneConnection(BaseModel):
     flux: float
     actors: list[str]
     has_new_edge: bool
+    authorized: bool              # all contributing actors have provenance
+    provenance_level: str         # strongest provenance of contributing actors
+    pattern_match_avg: float      # avg pattern match score across actors
 
 
 class ZonesResponse(BaseModel):
@@ -143,3 +146,32 @@ class TimelinePoint(BaseModel):
 class TimelineResponse(BaseModel):
     points: list[TimelinePoint]
     hours: int
+
+
+# --- /api/waterfall ---
+
+
+class WaterfallEvent(BaseModel):
+    event_id: str
+    ts: datetime
+    actor_id: str
+    action_type: str
+    target_zone: str
+    target_id: str
+    trigger_ref: str | None
+    provenance_level: str
+    provenance_source: str
+
+
+class WaterfallLane(BaseModel):
+    actor_id: str
+    provenance_level: str
+    pattern_match_score: float
+    residual_risk: float
+    fired_invariants: list[str]
+    events: list[WaterfallEvent]
+
+
+class WaterfallResponse(BaseModel):
+    window_start: datetime | None
+    lanes: list[WaterfallLane]

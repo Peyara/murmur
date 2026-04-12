@@ -1,4 +1,4 @@
-/** Minimal status overlay — system status, sigma, risk, timestamp. */
+/** Minimal status overlay — light mode. */
 
 import { TIER_COLORS } from '../lib/colors'
 import type { PulseResponse } from '../api/types'
@@ -19,19 +19,19 @@ export default function StatusBar({ data }: Props) {
           className="w-2 h-2 rounded-full animate-pulse"
           style={{ backgroundColor: color }}
         />
-        <span className="text-sm font-medium" style={{ color }}>
+        <span className="text-sm font-semibold" style={{ color }}>
           {data.status}
         </span>
       </div>
 
       {/* Metrics */}
-      <div className="text-xs text-murmur-slate space-y-0.5">
+      <div className="text-xs space-y-0.5" style={{ color: '#64748b' }}>
         <div>
-          sigma <span className="text-white">{data.sigma_coarse.toFixed(2)}</span>
+          sigma <span style={{ color: '#1a1a2e' }}>{data.sigma_coarse.toFixed(2)}</span>
           {' | '}
-          risk <span className="text-white">{data.max_residual.toFixed(3)}</span>
+          risk <span style={{ color: '#1a1a2e' }}>{data.max_residual.toFixed(3)}</span>
           {' | '}
-          <span className="text-white">{total}</span> actors
+          <span style={{ color: '#1a1a2e' }}>{total}</span> actors
         </div>
 
         {/* Tier breakdown */}
@@ -50,7 +50,7 @@ export default function StatusBar({ data }: Props) {
         )}
 
         {/* Timestamp */}
-        <div className="opacity-60">
+        <div style={{ color: '#94a3b8' }}>
           {data.window_start
             ? new Date(data.window_start).toLocaleString()
             : 'No data'}

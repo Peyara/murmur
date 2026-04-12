@@ -38,27 +38,27 @@ export default function ZoneDetail({ zone, window: win, onClose }: Props) {
   }, [onClose])
 
   return (
-    <div className="absolute right-0 top-0 h-full w-80 bg-murmur-navy/95 border-l border-murmur-steel overflow-y-auto">
+    <div className="absolute right-0 top-0 h-full w-80 bg-white/95 border-l overflow-y-auto shadow-lg" style={{ borderColor: '#e5e7eb' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-murmur-steel">
-        <h3 className="text-sm font-medium text-murmur-teal">{zone}</h3>
-        <button onClick={onClose} className="text-murmur-slate hover:text-white text-xs">
+      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: '#e5e7eb' }}>
+        <h3 className="text-sm font-semibold" style={{ color: '#0d9488' }}>{zone}</h3>
+        <button onClick={onClose} className="text-xs" style={{ color: '#94a3b8' }}>
           ESC
         </button>
       </div>
 
       {/* Content */}
       <div className="p-4 space-y-2">
-        {isLoading && <div className="text-murmur-slate text-xs">Loading...</div>}
+        {isLoading && <div className="text-xs" style={{ color: '#94a3b8' }}>Loading...</div>}
 
         {data?.actors.map((actor) => {
           const tier = classifyTier(actor.residual_risk)
           const color = TIER_COLORS[tier]
           return (
-            <div key={actor.actor_id} className="bg-murmur-steel/30 rounded p-3 space-y-2">
+            <div key={actor.actor_id} className="rounded-lg p-3 space-y-2 border" style={{ borderColor: '#f0f0f0', backgroundColor: '#fafafa' }}>
               {/* Actor name + tier badge */}
               <div className="flex items-center justify-between">
-                <span className="text-xs text-white truncate flex-1">
+                <span className="text-xs truncate flex-1" style={{ color: '#1a1a2e' }}>
                   {shortActor(actor.actor_id)}
                 </span>
                 <span
@@ -70,7 +70,7 @@ export default function ZoneDetail({ zone, window: win, onClose }: Props) {
               </div>
 
               {/* Risk bar */}
-              <div className="w-full h-1 bg-murmur-steel rounded-full overflow-hidden">
+              <div className="w-full h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#e5e7eb' }}>
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
@@ -81,10 +81,10 @@ export default function ZoneDetail({ zone, window: win, onClose }: Props) {
               </div>
 
               {/* Metrics */}
-              <div className="flex gap-3 text-[10px] text-murmur-slate">
-                <span>risk: <span className="text-white">{actor.residual_risk.toFixed(3)}</span></span>
-                <span>events: <span className="text-white">{actor.event_count}</span></span>
-                <span className="opacity-60">{actor.provenance_level}</span>
+              <div className="flex gap-3 text-[10px]" style={{ color: '#94a3b8' }}>
+                <span>risk: <span style={{ color: '#1a1a2e' }}>{actor.residual_risk.toFixed(3)}</span></span>
+                <span>events: <span style={{ color: '#1a1a2e' }}>{actor.event_count}</span></span>
+                <span>{actor.provenance_level}</span>
               </div>
 
               {/* Fired invariants */}
