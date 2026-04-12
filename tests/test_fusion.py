@@ -130,12 +130,12 @@ class TestFusion:
         assert count_few == 2
         assert count_many == 8
 
-        # inv_count contribution: 8/10*0.15 = 0.12 vs 2/10*0.15 = 0.03
+        # inv_count contribution: (8-2)/10 * weight
         from src.score.fusion import NORM_BOUNDS
         delta = FUSION_WEIGHTS["inv_count"] * (
             count_many / NORM_BOUNDS["inv_count"] - count_few / NORM_BOUNDS["inv_count"]
         )
-        assert delta > 0.08  # meaningful separation
+        assert delta > 0.05  # meaningful separation (threshold adjusted for Sprint 3 weight rebalance)
 
 
 class TestSigmoidNormalize:

@@ -12,32 +12,36 @@ from datetime import datetime
 import duckdb
 
 from src.schema import CanonicalEvent
+from src.score.closure import compute_closure_signals
 from src.score.invariants import check_invariants, compute_inv_score
 from src.score.novelty import compute_novelty_score
 from src.score.physics import compute_delta_f
 
-# Calibrated weights (Session I: dropped burst_per_min and breadth_entropy)
-# burst_per_min: 0.9x discrimination, r=0.085 — inverted signal, actively harmful
-# breadth_entropy: r=-0.37 — negatively correlated with risk
-# Freed 0.15 weight redistributed to the 3 strongest non-invariant signals
+# Calibrated weights (Sprint 3: added closure signals, rebalanced)
+# burst_per_min: 0.9x discrimination — dropped
+# breadth_entropy: r=-0.37 — dropped
+# closure_gap + orphaned_priv: 0.15 total from proportional reduction of existing
 FUSION_WEIGHTS = {
-    "inv_score": 0.20,
-    "inv_count": 0.15,
-    "novelty_score": 0.35,
-    "sigma_coarse": 0.05,
-    "bridge_new": 0.15,
-    "delta_f": 0.10,
+    "inv_score": 0.17,
+    "inv_count": 0.13,
+    "novelty_score": 0.30,
+    "sigma_coarse": 0.04,
+    "bridge_new": 0.13,
+    "delta_f": 0.08,
+    "closure_gap": 0.10,
+    "orphaned_priv": 0.05,
     "burst_per_min": 0.00,
     "breadth_entropy": 0.00,
 }
 
-# Normalization bounds (empirical, refined in Sprint 1B)
+# Normalization bounds (empirical, refined in Sprint 1B + Sprint 3)
 NORM_BOUNDS = {
     "inv_score": 5.0,
     "inv_count": 10.0,
     "novelty_score": 10.0,
     "bridge_new": 5.0,
     "delta_f": 5.0,
+    "orphaned_priv": 50.0,  # SA_KEY(5) * 10 overdue = max plausible with long-lived watches
     "burst_per_min": 20.0,
     "breadth_entropy": 4.0,
 }
@@ -118,6 +122,10 @@ def compute_fusion(
     # Novelty
     novelty_score = compute_novelty_score(db, window_start, actor_id)
 
+    # Closure signals
+    closure = compute_closure_signals(db, window_start, actor_id)
+    closure_gap = 1.0 - closure.closure_ratio  # invert: high ratio = low risk
+
     # Normalize all signals
     signals = {
         "inv_score": normalize(inv_score, NORM_BOUNDS["inv_score"]),
@@ -126,6 +134,8 @@ def compute_fusion(
         "novelty_score": normalize(novelty_score, NORM_BOUNDS["novelty_score"]),
         "bridge_new": normalize(float(bridge_new), NORM_BOUNDS["bridge_new"]),
         "delta_f": normalize(delta_f, NORM_BOUNDS["delta_f"]),
+        "closure_gap": closure_gap,  # already [0, 1]
+        "orphaned_priv": normalize(closure.orphaned_privilege, NORM_BOUNDS["orphaned_priv"]),
         "burst_per_min": normalize(burst_per_min, NORM_BOUNDS["burst_per_min"]),
         "breadth_entropy": normalize(breadth_entropy, NORM_BOUNDS["breadth_entropy"]),
     }
@@ -136,9 +146,12 @@ def compute_fusion(
     )
 
     # Write to risk_scores (residual_risk = fusion_raw for now)
-    explanation = "; ".join(
+    inv_explanation = "; ".join(
         r.explanation for r in inv_results if r.fired
     ) or "no invariants fired"
+    explanation = inv_explanation
+    if closure.explanation != "no closure watches":
+        explanation = f"{inv_explanation}; {closure.explanation}"
 
     db.execute(
         """
@@ -157,6 +170,8 @@ def compute_fusion(
             delta_f = EXCLUDED.delta_f,
             burst_per_min = EXCLUDED.burst_per_min,
             breadth_entropy = EXCLUDED.breadth_entropy,
+            closure_ratio = EXCLUDED.closure_ratio,
+            orphaned_privilege = EXCLUDED.orphaned_privilege,
             fusion_raw = EXCLUDED.fusion_raw,
             residual_risk = EXCLUDED.residual_risk,
             fired_invariants = EXCLUDED.fired_invariants,
@@ -166,8 +181,8 @@ def compute_fusion(
             window_start, actor_id,
             inv_score, float(inv_count), sigma_coarse, novelty_score,
             bridge_new, delta_f, burst_per_min, breadth_entropy,
-            0.0,  # closure_ratio (Session E)
-            0.0,  # orphaned_privilege (Session E)
+            closure.closure_ratio,
+            closure.orphaned_privilege,
             fusion_raw, fusion_raw,  # residual_risk = fusion_raw
             fired_json, explanation,
         ],

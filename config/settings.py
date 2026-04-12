@@ -1,5 +1,7 @@
 """Centralized configuration for all Murmur parameters."""
 
+from __future__ import annotations
+
 import json
 import os
 from dataclasses import dataclass, field
@@ -77,12 +79,9 @@ class MurmurSettings:
     trigger_chain_max_depth: int = 10
 
     # --- Closure (Sprint 3) ---
-    closure_sensitivity: dict[str, float] = field(default_factory=lambda: {
-        "SA_KEY": 5.0,
-        "IAM_POLICY": 4.0,
-        "IMPERSONATION": 4.0,
-        "SECRET": 3.0,
-    })
+    # Platform-specific closure config. GCP defaults below.
+    # To support a new platform, replace this with that platform's ClosureConfig.
+    closure: ClosureConfig = field(default_factory=lambda: _gcp_closure_config())  # noqa: F821
 
     def load_known_initiators(self) -> set[str]:
         """Load known initiator SA emails. Resolves PROJECT_NUMBER placeholder from env."""
@@ -103,6 +102,63 @@ class MurmurSettings:
                 entry = entry.replace("PROJECT_ID", project_id)
             resolved.add(entry)
         return resolved
+
+
+def _gcp_closure_config() -> ClosureConfig:  # noqa: F821
+    """GCP-specific closure configuration. The only platform-specific code."""
+    from src.score.closure import ClosureConfig
+
+    return ClosureConfig(
+        seeded_pairs=[
+            {
+                "pair_id": "seed-iam-create-key",
+                "opening_action_type": "IAM_CREATE_KEY",
+                "closing_action_type": "IAM_DELETE_KEY",
+                "window_hours": 720,
+                "tier": 1,
+            },
+            {
+                "pair_id": "seed-iam-create-sa",
+                "opening_action_type": "IAM_CREATE_SA",
+                "closing_action_type": "IAM_DELETE_SA",
+                "window_hours": 720,
+                "tier": 1,
+            },
+        ],
+        temporal_ttl={
+            "IAM_IMPERSONATE": 1,  # GCP access token default: 1 hour
+        },
+        opening_types={
+            "IAM_CREATE_KEY", "IAM_CREATE_SA", "IAM_IMPERSONATE",
+            "IAM_SET_POLICY", "COMPUTE_METADATA_CHANGE",
+        },
+        action_to_resource_type={
+            "IAM_CREATE_KEY": "SA_KEY",
+            "IAM_CREATE_SA": "SERVICE_ACCOUNT",
+            "IAM_IMPERSONATE": "IMPERSONATION",
+            "IAM_SET_POLICY": "IAM_POLICY",
+            "SECRET_ADMIN": "SECRET",
+            "COMPUTE_METADATA_CHANGE": "COMPUTE",
+        },
+        sensitivity={
+            "SA_KEY": 5.0,
+            "SERVICE_ACCOUNT": 4.0,
+            "IMPERSONATION": 4.0,
+            "IAM_POLICY": 4.0,
+            "SECRET": 3.0,
+            "COMPUTE": 2.0,
+            "UNKNOWN": 3.0,
+        },
+        settlement_hours={
+            "IMPERSONATION": 1,
+            "IAM_POLICY": 4,
+            "COMPUTE": 2,
+            "SECRET": 4,
+            "UNKNOWN": 4,
+        },
+        never_settle_types={"SA_KEY", "SERVICE_ACCOUNT"},
+        failsafe_zones={"IDENTITY", "CONTROL"},
+    )
 
 
 # Singleton instance — import this
