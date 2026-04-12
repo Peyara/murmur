@@ -12,6 +12,7 @@ Three layers:
 Failsafe invariant: unknown = open. Discovery can only close, never open.
 """
 
+import json as _json
 import math
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -19,8 +20,7 @@ from datetime import datetime
 
 import duckdb
 
-from src.schema import CanonicalEvent, TargetZone
-
+from src.schema import CanonicalEvent
 
 # ---------------------------------------------------------------------------
 # Configuration — platform-specific knowledge lives here
@@ -144,7 +144,9 @@ def _get_window_hours(event: CanonicalEvent, db: duckdb.DuckDBPyConnection, conf
     return config.settlement_hours.get(resource_type, 24)
 
 
-def create_watch(db: duckdb.DuckDBPyConnection, event: CanonicalEvent, config: ClosureConfig | None = None) -> str | None:
+def create_watch(
+    db: duckdb.DuckDBPyConnection, event: CanonicalEvent, config: ClosureConfig | None = None,
+) -> str | None:
     """Create a closure watch for a privileged opening event.
 
     Returns resource_id if watch created, None if skipped.
@@ -261,21 +263,29 @@ def check_temporal_expiry(db: duckdb.DuckDBPyConnection, current_ts: datetime) -
     Only applies to TEMPORAL_EXPIRY type. Explicit pairs do NOT auto-close.
     Returns count of watches closed.
     """
-    db.execute(
+    # Count eligible watches before update to compute delta
+    before = db.execute(
         """
-        UPDATE closure_state
-        SET is_closed = TRUE, closing_ts = ?
+        SELECT count(*) FROM closure_state
         WHERE is_closed = FALSE
           AND expected_close_type = 'TEMPORAL_EXPIRY'
           AND opening_ts + INTERVAL (window_hours) HOUR <= ?
         """,
-        [current_ts, current_ts],
-    )
-    row = db.execute(
-        "SELECT count(*) FROM closure_state WHERE closing_ts = ? AND expected_close_type = 'TEMPORAL_EXPIRY'",
         [current_ts],
-    ).fetchone()
-    return row[0] if row else 0
+    ).fetchone()[0]
+
+    if before > 0:
+        db.execute(
+            """
+            UPDATE closure_state
+            SET is_closed = TRUE, closing_ts = ?
+            WHERE is_closed = FALSE
+              AND expected_close_type = 'TEMPORAL_EXPIRY'
+              AND opening_ts + INTERVAL (window_hours) HOUR <= ?
+            """,
+            [current_ts, current_ts],
+        )
+    return before
 
 
 # ---------------------------------------------------------------------------
@@ -433,16 +443,13 @@ def mine_candidate_pairs(
         config = _default_config()
 
     # Build zone filter from config failsafe_zones + SECRET
-    sensitive_zones = config.failsafe_zones | {"SECRET"}
-    zone_placeholders = ", ".join(f"'{z}'" for z in sensitive_zones)
+    sensitive_zones = list(config.failsafe_zones | {"SECRET"})
+    placeholders = ", ".join("?" for _ in sensitive_zones)
 
     sensitive = db.execute(
-        f"""
-        SELECT target_id, action_type, ts
-        FROM events
-        WHERE target_zone IN ({zone_placeholders})
-        ORDER BY target_id, ts
-        """,  # noqa: S608 — zone values from config, not user input
+        f"SELECT target_id, action_type, ts FROM events "  # noqa: S608
+        f"WHERE target_zone IN ({placeholders}) ORDER BY target_id, ts",
+        sensitive_zones,
     ).fetchall()
 
     # Group by target_id and find (action_A → next different action_B) sequences
@@ -476,6 +483,7 @@ def mine_candidate_pairs(
         candidate_id = f"cp-{opening_type}-{closing_type}"
 
         now = datetime.now(tz=None)
+        sig = _json.dumps({"opening": opening_type, "closing": closing_type, "median_gap_hours": round(median_gap, 1)})
         db.execute(
             """
             INSERT INTO candidate_patterns (
@@ -487,10 +495,7 @@ def mine_candidate_pairs(
                 composite_score = EXCLUDED.composite_score,
                 last_seen = EXCLUDED.last_seen
             """,
-            [candidate_id,
-             f'{{"opening": "{opening_type}", "closing": "{closing_type}", "median_gap_hours": {median_gap:.1f}}}',
-             float(obs_count),
-             obs_count, now, now],
+            [candidate_id, sig, float(obs_count), obs_count, now, now],
         )
 
         candidates.append({
@@ -512,7 +517,6 @@ def promote_candidates(
 
     Platform-agnostic: operates purely on candidate_patterns table.
     """
-    import json as _json
 
     rows = db.execute(
         """
