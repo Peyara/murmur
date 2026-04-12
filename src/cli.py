@@ -1,5 +1,6 @@
 """Murmur CLI — entry point for all commands."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -346,3 +347,33 @@ def inspect(directory: str, cluster_window: float):
     click.echo(f"Inspecting logs in {directory} ...")
     report = inspect_logs(directory, cluster_window_seconds=cluster_window)
     click.echo(format_report(report))
+
+
+@cli.command("generate")
+@click.option("--actors", type=int, default=10, help="Number of service accounts (5-50).")
+@click.option("--windows", type=int, default=20, help="Number of 15-min windows (5-100).")
+@click.option("--attack-ratio", type=float, default=0.1, help="Fraction of windows with attacks (0.0-1.0).")
+@click.option("--seed", type=int, default=42, help="Random seed for reproducibility.")
+@click.option("--output", type=click.Path(dir_okay=False), required=True, help="Output JSONL file path.")
+def generate(actors: int, windows: int, attack_ratio: float, seed: int, output: str):
+    """Generate synthetic GCP audit log trajectory."""
+    from src.synthetic import generate_trajectory
+    try:
+        if actors < 5 or actors > 50:
+            raise click.BadParameter("--actors must be between 5 and 50")
+        if windows < 5 or windows > 100:
+            raise click.BadParameter("--windows must be between 5 and 100")
+        if attack_ratio < 0.0 or attack_ratio > 1.0:
+            raise click.BadParameter("--attack-ratio must be between 0.0 and 1.0")
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        click.echo(f"Generating trajectory: {actors} actors, {windows} windows, attack_ratio={attack_ratio}, seed={seed}")
+        events = generate_trajectory(actors=actors, windows=windows, attack_ratio=attack_ratio, seed=seed)
+        click.echo(f"Generated {len(events)} events")
+        with open(output_path, "w") as f:
+            for event in events:
+                f.write(json.dumps(event) + "\n")
+        click.echo(f"Output written to {output_path}")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
