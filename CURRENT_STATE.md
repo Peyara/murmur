@@ -9,7 +9,7 @@
 
 ## Last Completed Milestone
 
-Session K (2026-04-12): Sprint 3 closure system built, calibrated, generalized, merged. Three-layer engine (explicit pairs, temporal TTL, settlement + auto-discovery), policy layer (risk_energy + shadow bandit), ClosureConfig for platform generalization. 23.0x separation on real data. 438 tests green on main. dotenv auto-loading fixed permanently.
+Session L (2026-04-12): Added Autonomous mode to peyara-standards (PR #4 merged). Third session mode for parallel agentic execution with PR-gated review, worktree isolation, relaxed sign-off within scope boundaries. No Murmur code changes this session.
 
 ## GCP Sandbox Status
 
@@ -21,23 +21,25 @@ Session K (2026-04-12): Sprint 3 closure system built, calibrated, generalized, 
 
 ## Open Blockers / Questions
 
-1. **Closure signal ablation** — run with weights=0 to isolate independent contribution vs weight rebalancing
-2. **Sprint 2 merge** — PR #21 on branch, contains dotenv fix main doesn't have yet
-3. **Synthetic generator** — next major work item. Replaces benchmark expansion (6/18 scenarios).
+1. **Merge Sprint 2** — PR #21 on branch, contains dotenv fix main doesn't have yet
+2. **Synthetic generator** — next major work item. Replaces benchmark expansion (6/18 scenarios).
+3. **Closure signal ablation** — run with weights=0 to isolate independent contribution vs weight rebalancing
 4. **Discovery causality** — pair mining finds co-occurrence, not causation. Needs directionality filter.
-5. **Post-MVP roadmap** — synthetic generator → autonomous agent simulation (OpenClaw/similar) → real customer data (Shamreen's company)
+5. **Autonomous mode untested** — spec exists in peyara-standards but no session has run in Autonomous mode yet
+6. **peyara-standards unreviewed additions** — new commands (architect, cleanup-pass, tdd-guide, etc.), settings-base.json, autonomous-loops-reference.md appeared on remote
 
 ## Files to Read for Context
 
 - **Sprint 3 closure:** `src/score/closure.py` (ClosureConfig, engine), `src/policy/` (energy, bandit)
 - **Fusion weights:** `src/score/fusion.py` (10 signals, closure_gap + orphaned_priv)
-- **Session K learnings:** `LEARNINGS.md` (top entry)
+- **Session L learnings:** `LEARNINGS.md` (top entry)
+- **Autonomous mode spec:** `peyara-standards/global/CLAUDE.md` (Mode: Autonomous section)
 - **Post-MVP roadmap:** memory file `project_roadmap_post_mvp.md`
-- **Agentic red teaming refs:** memory file `reference_agentic_red_teaming.md`
 
 ## What To Do Next
 
 1. **Merge Sprint 2** — land PR #21 to main (or cherry-pick dotenv fix separately)
-2. **Design synthetic generator** — architecture for diverse audit log trajectory generation at scale
-3. **Run closure ablation** — weights=0 to prove/disprove signal value
-4. **Sprint spec cleanup** — write/update sprint docs for Sprint 2 + Sprint 3
+2. **Review peyara-standards additions** — new commands and settings from remote
+3. **Design synthetic generator** — architecture for diverse audit log trajectory generation at scale
+4. **Run closure ablation** — weights=0 to prove/disprove signal value
+5. **Try Autonomous mode** — first real test with a Murmur feature task

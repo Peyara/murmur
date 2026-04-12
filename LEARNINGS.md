@@ -6,6 +6,40 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-12 — Production — Session L: Autonomous mode added to Peyara standards
+
+**Session Summary**
+- Mode: Production
+- Added "Autonomous" as a 3rd session mode to peyara-standards (alongside Production and R&D)
+- Designed collaboratively: evaluated 3 override approaches, selected mode-in-global-standards
+- Defined: relaxation rules, absolute safety rails, PR-per-feature checkpoints, worktree multi-agent coordination
+- Updated global/CLAUDE.md, peyara/CLAUDE.md, README.md
+- PR #4 merged to peyara-standards main
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Mode in global CLAUDE.md (Option A) | Separate profile (B), project-level opt-in (C) | B: file drift + install.sh switching. C: scaffold-time lock, not session-start. |
+| PR-per-feature checkpoint | Interval summaries, full session review | Intervals add friction. Full review too late. PR is natural boundary. |
+| Worktree isolation | Sequential handoff, orchestrator+workers | Sequential defeats parallelism. Orchestrator adds complexity. Worktrees = natural containment. |
+| No secret keyword | Keyword/passphrase trigger | Not authentication — just competing instructions. Scoping > access control theater. |
+| All four safety categories relaxed | Partial relaxation | Absolute rails + worktree isolation provide sufficient containment. |
+
+**Exceptions**
+- "One feature per session" — crossed into peyara-standards from Murmur directory. One-off (infrastructure work).
+
+**Open Questions**
+1. Autonomous mode untested in practice — first real session will surface gaps
+2. Scope boundary enforcement is instruction-based, no mechanical enforcement
+3. Orchestrator pattern (lead agent assigning task specs) undefined
+4. peyara-standards remote had additional unreviewed commits (new commands, settings-base.json, autonomous-loops-reference.md)
+
+**Evolution Candidates**
+- Cross-project "infrastructure sessions" pattern — watch (see if it recurs)
+
+---
+
 ### 2026-04-12 — Production — Session K: Sprint 3 closure system, policy layer, generalization
 
 **Session Summary**
