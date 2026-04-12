@@ -367,8 +367,14 @@ def generate(actors: int, windows: int, attack_ratio: float, seed: int, output: 
             raise click.BadParameter("--attack-ratio must be between 0.0 and 1.0")
         output_path = Path(output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        click.echo(f"Generating trajectory: {actors} actors, {windows} windows, attack_ratio={attack_ratio}, seed={seed}")
-        events = generate_trajectory(actors=actors, windows=windows, attack_ratio=attack_ratio, seed=seed)
+        msg = (
+            f"Generating trajectory: {actors} actors, {windows} windows, "
+            f"attack_ratio={attack_ratio}, seed={seed}"
+        )
+        click.echo(msg)
+        events = generate_trajectory(
+            actors=actors, windows=windows, attack_ratio=attack_ratio, seed=seed
+        )
         click.echo(f"Generated {len(events)} events")
         with open(output_path, "w") as f:
             for event in events:

@@ -1,8 +1,9 @@
 import random
 
+
 class ProvenanceGenerator:
     def __init__(self, seed: int = 42):
-        self.rng = random.Random(seed)
+        self.rng = random.Random(seed)  # noqa: S311
         self.trigger_counter = 0
 
     def benign_trigger_ref(self, actor_email: str) -> str:
@@ -14,6 +15,7 @@ class ProvenanceGenerator:
 
     def add_trigger_ref(self, event: dict, trigger_ref: str | None) -> dict:
         if trigger_ref:
-            if "metadata" not in event: event["metadata"] = {}
+            if "metadata" not in event:
+                event["metadata"] = {}
             event["metadata"]["trigger_ref"] = trigger_ref
         return event
