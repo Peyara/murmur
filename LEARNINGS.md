@@ -6,6 +6,55 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-12 — Production — Session K: Sprint 3 closure system, policy layer, generalization
+
+**Session Summary**
+- Mode: Production, local
+- Fixed dotenv auto-loading (permanent fix for recurring correlation failure)
+- Fresh data pull: 12,569 new events, Apr 6+ data 0% → 86.9% trigger_ref coverage
+- Built full Sprint 3 closure system: three-layer engine (explicit pairs, temporal TTL, resource-state settlement with auto-discovery), policy layer (risk_energy + shadow bandit), fusion integration
+- Calibrated on real data: 23.0x separation (up from 21.8x), false HIGHs 4→2
+- Generalized to platform-agnostic ClosureConfig dataclass
+- PR review: 5 warnings fixed (SQL parameterization, JSON safety, lint)
+- PR #23 merged to main. 438 tests green on main.
+- Researched OpenClaw and autonomous agent frameworks for post-MVP simulation
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Three-layer closure + auto-discovery | Predefined pairs only; zero-config discovery; EMA baseline | Pairs cover <1% real data. Zero-config too slow. EMA needs calibration data. |
+| Auto-promote discovered pairs (5+ obs) | Human gate; hybrid | Failsafe (discovery only closes) makes auto-promotion safe. |
+| ClosureConfig dataclass generalization | JSON config files; discovery-only | Dataclass is type-checked, in-code, with GCP defaults. |
+| Exclude SECRET_ADMIN from openings | Include all sensitive zone actions | 383 benign events created never-closing watches, tanked separation to 7.2x. |
+| Closure weights 0.15 total (0.10 + 0.05) | Higher weights | Conservative for unproven signal. Tune after synthetic generator. |
+| Post-MVP: synthetic generator → agent simulation → real data | Expand sandbox; jump to customer | Sandbox hit ceiling. Synthetic is cheapest path to diversity. |
+
+**Findings**
+
+| Finding | Impact | Action |
+|---|---|---|
+| Closure signal improves separation 21.8x→23.0x, but improvement may be from weight rebalancing, not signal | Closure hypothesis is architecturally sound but statistically unproven | Need ablation test (closure weights=0) to isolate |
+| Predefined pairs cover <1% of real privileged actions (4 key creates, 0 deletes in 35K events) | Explicit pairs alone are useless for GCP | Settlement + discovery are the real mechanisms |
+| Discovery finds temporal co-occurrence, not causation (SET_POLICY→IMPERSONATE is just "same actor did both") | Discovery algorithm needs directionality/causality filter | Post-MVP refinement |
+| SECRET_ADMIN as opening type creates 383 watches that never close — destroys separation | Routine operations must be excluded from closure tracking | Tightened to IDENTITY+CONTROL zones only |
+| dotenv not auto-loaded = recurring correlation failure every fresh shell | Every previous session's correlation depended on manual `set -a; source .env` | Added python-dotenv permanently |
+| Handcrafted sandbox (2 SAs, 35K events) validates plumbing, not intelligence | New signals will always show "improvement" on simple data | Synthetic generator is next priority |
+
+**CLAUDE.md Exceptions**
+- "Tests before code": calibration constants tuned empirically post-implementation (one-off)
+- "One feature per session": closure + policy + dotenv + generalization + research (one-off, dotenv was prerequisite)
+- "Plan first": dotenv fix applied without formal plan (one-off, 2-line fix)
+
+**Open Questions**
+1. Ablation test: closure weights=0 vs current — isolate signal value
+2. Sprint 2 PR #21 still on branch, needs merge (contains dotenv fix main lacks)
+3. Benchmark expansion (6/18) — deferred, may be replaced by synthetic generator
+4. Synthetic generator architecture — next major work item
+5. Discovery co-occurrence vs causation — needs directionality filter
+
+---
+
 ### 2026-04-05 — R&D — Session J: Signal assessment, weight rebalance, Sprint 1B closed
 
 **Session Summary**
