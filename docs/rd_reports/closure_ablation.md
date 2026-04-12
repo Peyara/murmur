@@ -7,8 +7,8 @@
 ## Method
 
 - **Baseline:** current FUSION_WEIGHTS (closure_gap=0.10, orphaned_priv=0.05)
-- **Ablation A (zero):** closure weights set to 0, remaining 8 signals renormalized to sum=1.0
-- **Ablation B (redistribute):** closure weight (0.15) redistributed proportionally across remaining signals
+- **Ablation A (zero):** closure weights set to 0, renormalized to sum=1.0
+- **Ablation B (redistribute):** closure weight redistributed proportionally
 
 Weights after ablation:
 
@@ -91,9 +91,9 @@ Before interpreting ablation, check if closure signals are even active:
 
 ### Does closure add independent detection value?
 
-If zero and redistribute produce **similar** deltas, the effect is purely from weight redistribution
-(other signals absorb the freed weight). If zero produces **larger** deltas or different tier migrations,
-closure carries independent signal.
+If zero and redistribute produce **similar** deltas, the effect is purely
+from weight redistribution. If zero produces **larger** deltas or different
+tier migrations, closure carries independent signal.
 
 - Zero ablation mean delta: 0.007152
 - Redistribute mean delta: 0.007152
@@ -102,15 +102,16 @@ closure carries independent signal.
 ### Tier stability
 
 - Zero: 38/2497 pairs changed tier (1.5%)
-- Redistribute: 38/2497 pairs changed tier (1.5%)
+- Redistribute: 38/2497 changed (1.5%)
 
 ## Conclusion
 
 Closure signal impact is primarily from weight redistribution.
 
-**Signal activity:** closure_gap is active in 1.8% of pairs, orphaned_priv in 1.0%.
+**Signal activity:** closure_gap active in 1.8% of pairs, orphaned_priv in 1.0%.
 Low activity means the signal hasn't had enough data to exercise closure patterns — the ablation may not be representative of steady-state behavior.
 
-**Recommendation:** Review the tier migration tables and top-10 affected pairs to determine if the pairs
-that change tier are ones where closure *should* matter (attack scenarios with unclosed privilege grants)
+**Recommendation:** Review the tier migration tables and top-10 affected
+pairs to determine if the pairs that change tier are ones where closure
+*should* matter (attack scenarios with unclosed privilege grants)
 vs. ones where it's noise.
