@@ -53,7 +53,7 @@ class ActorPopulation:
 
     def __init__(self, count: int, seed: int = 42):
         self.count = max(5, min(50, count))
-        self.rng = random.Random(seed)  # noqa: S311
+        self.rng = random.Random(seed)  # noqa: S311  # nosec B311
         self.actors = []
         self._generate_actors()
 

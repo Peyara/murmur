@@ -3,7 +3,7 @@ import random
 
 class ProvenanceGenerator:
     def __init__(self, seed: int = 42):
-        self.rng = random.Random(seed)  # noqa: S311
+        self.rng = random.Random(seed)  # noqa: S311  # nosec B311
         self.trigger_counter = 0
 
     def benign_trigger_ref(self, actor_email: str) -> str:

@@ -18,7 +18,7 @@ class TrajectoryComposer:
         self.actors = ActorPopulation(actors, seed)
         self.temporal = TemporalEngine(seed)
         self.provenance = ProvenanceGenerator(seed)
-        self.rng = random.Random(seed)  # noqa: S311
+        self.rng = random.Random(seed)  # noqa: S311  # nosec B311
         self.window_count = max(5, min(100, windows))
         self.attack_ratio = max(0.0, min(1.0, attack_ratio))
         self.seed = seed

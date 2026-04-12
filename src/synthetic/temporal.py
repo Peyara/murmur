@@ -7,7 +7,7 @@ class TemporalEngine:
     PROJECT_START = datetime(2026, 1, 15, 0, 0, 0)
 
     def __init__(self, seed: int = 42):
-        self.rng = random.Random(seed)  # noqa: S311
+        self.rng = random.Random(seed)  # noqa: S311  # nosec B311
         self.current_time = self.PROJECT_START
 
     def get_windows(self, count: int):
