@@ -5,8 +5,23 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = Path(__file__).parent
+
+# Auto-load .env so GCP_PROJECT_ID, GCS_AUDIT_BUCKET, etc. are always available.
+load_dotenv(PROJECT_ROOT / ".env", override=False)
+
+
+def _parse_service_worker_map(raw: str) -> dict[str, str]:
+    """Parse and validate SERVICE_WORKER_MAP env var (JSON string -> dict[str, str])."""
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()
+    ):
+        raise ValueError("SERVICE_WORKER_MAP must be a JSON object with string keys and values")
+    return parsed
 
 
 @dataclass
@@ -63,14 +78,20 @@ class MurmurSettings:
     pattern_weight_rate: float = 0.15
 
     # --- Correlation (Sprint 1) ---
-    # Maps Cloud Run service_name → expected worker SA email (requires GCP_PROJECT_ID)
+    # Maps Cloud Run service_name → expected worker SA email.
+    # Override via SERVICE_WORKER_MAP env var (JSON string) for other GCP projects.
+    # Default uses GCP_PROJECT_ID to construct sandbox SA emails.
     service_worker_map: dict[str, str] = field(default_factory=lambda: (
-        {
-            "normal-worker": f"normal-worker-sa@{pid}.iam.gserviceaccount.com",
-            "maintainer": f"maintenance-sa@{pid}.iam.gserviceaccount.com",
-        }
-        if (pid := os.environ.get("GCP_PROJECT_ID"))
-        else {}
+        _parse_service_worker_map(os.environ["SERVICE_WORKER_MAP"])
+        if "SERVICE_WORKER_MAP" in os.environ
+        else (
+            {
+                "normal-worker": f"normal-worker-sa@{pid}.iam.gserviceaccount.com",
+                "maintainer": f"maintenance-sa@{pid}.iam.gserviceaccount.com",
+            }
+            if (pid := os.environ.get("GCP_PROJECT_ID"))
+            else {}
+        )
     ))
 
     # --- Trigger chain ---

@@ -332,6 +332,21 @@ def benchmark(scenario: str | None, run_all: bool, history: str | None, patterns
         click.echo(format_comparison_table(results))
 
 
+@cli.command("serve")
+@click.option("--host", default="127.0.0.1", help="Bind address.")
+@click.option("--port", default=8000, type=int, help="Bind port.")
+@click.option("--db-path", default=None, help="Path to DuckDB file (default: from settings).")
+def serve(host: str, port: int, db_path: str | None):
+    """Start the Murmur dashboard API server."""
+    import uvicorn
+
+    from src.report.api import create_app
+
+    application = create_app(db_path=db_path)
+    click.echo(f"Murmur API: http://{host}:{port}/api/pulse")
+    uvicorn.run(application, host=host, port=port, log_level="info")
+
+
 @cli.command("inspect")
 @click.argument("directory", type=click.Path(exists=True, file_okay=False))
 @click.option(
@@ -346,3 +361,7 @@ def inspect(directory: str, cluster_window: float):
     click.echo(f"Inspecting logs in {directory} ...")
     report = inspect_logs(directory, cluster_window_seconds=cluster_window)
     click.echo(format_report(report))
+
+
+if __name__ == "__main__":
+    cli()
