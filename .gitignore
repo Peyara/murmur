@@ -31,6 +31,9 @@ application_default_credentials.json
 data/raw_inspection/
 data/real/
 
+# Synthetic generated trajectories (for testing/R&D)
+data/synthetic/
+
 # Attack injection results (may contain project IDs, never commit)
 data/attack_results/
 
