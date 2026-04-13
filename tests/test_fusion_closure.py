@@ -1,6 +1,5 @@
 """Tests for closure signal integration into the fusion pipeline."""
 
-import json
 from datetime import datetime, timedelta
 
 from config.settings import MurmurSettings
@@ -69,7 +68,7 @@ class TestClosureInFusion:
 
     def test_orphaned_key_increases_score(self, db):
         """Creating a key without deletion should increase fusion score."""
-        from src.score.closure import seed_pairs, create_watch
+        from src.score.closure import create_watch, seed_pairs
 
         seed_pairs(db)
 
@@ -116,7 +115,7 @@ class TestClosureInFusion:
             [W_LATE, ACTOR, 1, '["GCS_READ"]', '["DATA"]', '["t1"]', 0.5, 0.0, "NONE"],
         )
 
-        fusion_with_orphan = compute_fusion(db, W_LATE, ACTOR, KNOWN)
+        compute_fusion(db, W_LATE, ACTOR, KNOWN)
 
         # The orphaned key should contribute to a higher score
         row = db.execute(

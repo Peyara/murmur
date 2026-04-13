@@ -1,10 +1,6 @@
 """Tests for the policy layer — risk energy and shadow bandit."""
 
-from datetime import datetime, timedelta
-
-from src.schema import ActionType, TargetType, TargetZone
-from src.ingest.dedup import insert_event
-from tests.conftest import make_event
+from datetime import datetime
 
 W1 = datetime(2026, 3, 25, 10, 0, 0)
 ACTOR = "test-sa@project.iam.gserviceaccount.com"

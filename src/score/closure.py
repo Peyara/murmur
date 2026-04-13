@@ -447,7 +447,7 @@ def mine_candidate_pairs(
     placeholders = ", ".join("?" for _ in sensitive_zones)
 
     sensitive = db.execute(
-        f"SELECT target_id, action_type, ts FROM events "  # noqa: S608
+        f"SELECT target_id, action_type, ts FROM events "  # noqa: S608  # nosec B608
         f"WHERE target_zone IN ({placeholders}) ORDER BY target_id, ts",
         sensitive_zones,
     ).fetchall()

@@ -1,11 +1,9 @@
 """Tests for closure system — resource state tracking, settlement, and scoring."""
 
-import json
-import math
 from datetime import datetime, timedelta
 
-from src.schema import ActionType, TargetType, TargetZone
 from src.ingest.dedup import insert_event
+from src.schema import ActionType, TargetType, TargetZone
 from tests.conftest import make_event
 
 W1 = datetime(2026, 3, 25, 10, 0, 0)
@@ -51,7 +49,7 @@ class TestSeedPairs:
 # ---------------------------------------------------------------------------
 class TestCreateWatch:
     def test_opening_creates_watch(self, db):
-        from src.score.closure import seed_pairs, create_watch
+        from src.score.closure import create_watch, seed_pairs
 
         seed_pairs(db)
         evt = _insert_event(
@@ -69,7 +67,7 @@ class TestCreateWatch:
         assert row[0] is False  # is_closed
 
     def test_non_opening_skipped(self, db):
-        from src.score.closure import seed_pairs, create_watch
+        from src.score.closure import create_watch, seed_pairs
 
         seed_pairs(db)
         evt = _insert_event(
@@ -86,7 +84,7 @@ class TestCreateWatch:
         assert count == 0
 
     def test_duplicate_resource_idempotent(self, db):
-        from src.score.closure import seed_pairs, create_watch
+        from src.score.closure import create_watch, seed_pairs
 
         seed_pairs(db)
         evt1 = _insert_event(
@@ -111,7 +109,7 @@ class TestCreateWatch:
 
     def test_unknown_action_identity_zone_creates_watch(self, db):
         """Failsafe: unknown action in IDENTITY zone → treat as opening."""
-        from src.score.closure import seed_pairs, create_watch
+        from src.score.closure import create_watch, seed_pairs
 
         seed_pairs(db)
         evt = _insert_event(
@@ -131,7 +129,7 @@ class TestCreateWatch:
 # ---------------------------------------------------------------------------
 class TestExplicitClose:
     def test_matching_close_marks_closed(self, db):
-        from src.score.closure import seed_pairs, create_watch, try_close_watch
+        from src.score.closure import create_watch, seed_pairs, try_close_watch
 
         seed_pairs(db)
         # Open: create key
@@ -159,7 +157,7 @@ class TestExplicitClose:
         assert row[0] is True
 
     def test_non_matching_not_closed(self, db):
-        from src.score.closure import seed_pairs, create_watch, try_close_watch
+        from src.score.closure import create_watch, seed_pairs, try_close_watch
 
         seed_pairs(db)
         evt_open = _insert_event(
@@ -188,7 +186,7 @@ class TestExplicitClose:
 # ---------------------------------------------------------------------------
 class TestTemporalExpiry:
     def test_impersonation_auto_closes_after_ttl(self, db):
-        from src.score.closure import seed_pairs, create_watch, check_temporal_expiry
+        from src.score.closure import check_temporal_expiry, create_watch, seed_pairs
 
         seed_pairs(db)
         evt = _insert_event(
@@ -208,7 +206,7 @@ class TestTemporalExpiry:
         assert row[0] is True
 
     def test_sa_key_does_not_auto_close(self, db):
-        from src.score.closure import seed_pairs, create_watch, check_temporal_expiry
+        from src.score.closure import check_temporal_expiry, create_watch, seed_pairs
 
         seed_pairs(db)
         evt = _insert_event(
@@ -270,7 +268,7 @@ class TestSettlement:
 # ---------------------------------------------------------------------------
 class TestClosureRatio:
     def test_all_closed(self, db):
-        from src.score.closure import seed_pairs, create_watch, try_close_watch, compute_closure_signals
+        from src.score.closure import compute_closure_signals, create_watch, seed_pairs, try_close_watch
 
         seed_pairs(db)
         # Open and close a key
@@ -296,7 +294,7 @@ class TestClosureRatio:
         assert result.closure_ratio == 1.0
 
     def test_none_closed(self, db):
-        from src.score.closure import seed_pairs, create_watch, compute_closure_signals
+        from src.score.closure import compute_closure_signals, create_watch, seed_pairs
 
         seed_pairs(db)
         evt = _insert_event(
@@ -313,7 +311,7 @@ class TestClosureRatio:
         assert result.closure_ratio == 0.0
 
     def test_mixed(self, db):
-        from src.score.closure import seed_pairs, create_watch, try_close_watch, compute_closure_signals
+        from src.score.closure import compute_closure_signals, create_watch, seed_pairs, try_close_watch
 
         seed_pairs(db)
         # Open two watches
@@ -363,7 +361,7 @@ class TestClosureRatio:
 class TestBareConfig:
     def test_bare_config_no_crash(self, db):
         """Empty ClosureConfig works — engine runs with zero platform knowledge."""
-        from src.score.closure import ClosureConfig, seed_pairs, compute_closure_signals
+        from src.score.closure import ClosureConfig, compute_closure_signals, seed_pairs
 
         bare = ClosureConfig()  # all defaults: empty lists/sets
         count = seed_pairs(db, bare)
@@ -395,7 +393,7 @@ class TestBareConfig:
 # ---------------------------------------------------------------------------
 class TestOrphanedPrivilege:
     def test_overdue_sa_key_scores_high(self, db):
-        from src.score.closure import seed_pairs, create_watch, compute_closure_signals
+        from src.score.closure import compute_closure_signals, create_watch, seed_pairs
 
         seed_pairs(db)
         evt = _insert_event(
@@ -414,7 +412,7 @@ class TestOrphanedPrivilege:
         assert result.orphaned_privilege >= 5.0
 
     def test_within_window_no_orphan_score(self, db):
-        from src.score.closure import seed_pairs, create_watch, compute_closure_signals
+        from src.score.closure import compute_closure_signals, create_watch, seed_pairs
 
         seed_pairs(db)
         evt = _insert_event(
@@ -431,7 +429,7 @@ class TestOrphanedPrivilege:
         assert result.orphaned_privilege == 0.0
 
     def test_closed_watch_no_orphan_score(self, db):
-        from src.score.closure import seed_pairs, create_watch, try_close_watch, compute_closure_signals
+        from src.score.closure import compute_closure_signals, create_watch, seed_pairs, try_close_watch
 
         seed_pairs(db)
         evt_open = _insert_event(

@@ -1,5 +1,6 @@
 """Murmur CLI — entry point for all commands."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -346,3 +347,68 @@ def inspect(directory: str, cluster_window: float):
     click.echo(f"Inspecting logs in {directory} ...")
     report = inspect_logs(directory, cluster_window_seconds=cluster_window)
     click.echo(format_report(report))
+
+
+@cli.command("generate")
+@click.option("--actors", type=int, default=10, help="Number of service accounts (5-50).")
+@click.option("--windows", type=int, default=20, help="Number of 15-min windows (5-100).")
+@click.option("--attack-ratio", type=float, default=0.1, help="Fraction of windows with attacks (0.0-1.0).")
+@click.option("--seed", type=int, default=42, help="Random seed for reproducibility.")
+@click.option("--output", type=click.Path(dir_okay=False), required=True, help="Output JSONL file path.")
+def generate(actors: int, windows: int, attack_ratio: float, seed: int, output: str):
+    """Generate synthetic GCP audit log trajectory."""
+    from src.synthetic import generate_trajectory
+    try:
+        if actors < 5 or actors > 50:
+            raise click.BadParameter("--actors must be between 5 and 50")
+        if windows < 5 or windows > 100:
+            raise click.BadParameter("--windows must be between 5 and 100")
+        if attack_ratio < 0.0 or attack_ratio > 1.0:
+            raise click.BadParameter("--attack-ratio must be between 0.0 and 1.0")
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        msg = (
+            f"Generating trajectory: {actors} actors, {windows} windows, "
+            f"attack_ratio={attack_ratio}, seed={seed}"
+        )
+        click.echo(msg)
+        events = generate_trajectory(
+            actors=actors, windows=windows, attack_ratio=attack_ratio, seed=seed
+        )
+        click.echo(f"Generated {len(events)} events")
+        with open(output_path, "w") as f:
+            for event in events:
+                f.write(json.dumps(event) + "\n")
+        click.echo(f"Output written to {output_path}")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command("ablate")
+@click.option("--db-path", default=None, help="Path to DuckDB file.")
+@click.option("--output", default="docs/rd_reports/closure_ablation.md", help="Output report path.")
+def ablate(db_path: str | None, output: str):
+    """Run closure signal ablation study (read-only)."""
+    from src.score.ablation import capture_baseline, generate_report, run_ablation
+
+    db_path = db_path or SETTINGS.db_path
+    click.echo(f"Reading baseline from {db_path}...")
+    baseline = capture_baseline(db_path)
+    click.echo(f"  {len(baseline)} scored pairs loaded.")
+
+    closure_signals = ["closure_gap", "orphaned_priv"]
+
+    click.echo("Running zero ablation...")
+    zero_result = run_ablation(baseline, closure_signals, mode="zero")
+    click.echo(f"  {sum(1 for _, _, o, n in zero_result.rows if o != n)} tier changes.")
+
+    click.echo("Running redistribute ablation...")
+    redist_result = run_ablation(baseline, closure_signals, mode="redistribute")
+    click.echo(f"  {sum(1 for _, _, o, n in redist_result.rows if o != n)} tier changes.")
+
+    report = generate_report(baseline, zero_result, redist_result, db_path)
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report)
+    click.echo(f"Report written to {output_path}")
