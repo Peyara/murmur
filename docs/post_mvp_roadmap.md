@@ -8,6 +8,40 @@ Components are ordered by value-to-effort ratio. Each has explicit prerequisites
 
 ---
 
+## Phase 0: Synthetic Generator Hardening (immediate, pre-MVP validation)
+
+### 0.1 ActionType Coverage + Noise Diversity
+
+**Status:** PR #27 (`auto/synth-coverage`)
+
+Expanded from 12/19 to 17/19 parseable ActionTypes. Added KMS encrypt/decrypt, scheduler setup, and key cleanup workflows. Background noise expanded from 3 to 8 action types via `NOISE_ACTIONS` constant.
+
+### 0.2 Evidence-Grounded Temporal Profiles
+
+**Status:** PR #28 (`auto/synth-realism`)
+
+Temporal profiles parameterized from empirical evidence, not assumptions. See `docs/rd_reports/2026-04-13_temporal_profile_evidence.md` for full research.
+
+| Profile | Default | Evidence |
+|---|---|---|
+| `burst_cluster(spread_sec=30)` | 30s spread | M-Trends 2026: 22s median handoff |
+| `stealth_spread(min_gap_sec=120)` | 120s gap | GCP IAM propagation: 2-7 min minimum |
+| `scheduled_periodic(jitter_sec=2)` | ±2s jitter | Cloud Scheduler wall-clock behavior |
+
+Attack provenance patterns: `no_trigger_ref()`, `forged_trigger_ref()`, `partial_trigger_ref()`.
+
+**Key finding:** Poisson is empirically invalid for cloud traffic (Paxson 1995). Benign activity is bursty and self-similar, not memoryless.
+
+### 0.3 Composer Integration (next)
+
+Wire temporal profiles and provenance patterns into `TrajectoryComposer`. Attack windows get burst/stealth timing + missing/forged provenance. Benign windows get periodic/clustered timing + valid provenance. Full pipeline validation: 100+ windows through ingest → score.
+
+### 0.4 Architectural Signal: RANK-Style Transition Weights
+
+Research surfaced the RANK paper (Soliman et al., IEEE TDSC) — graph-based incident extraction using MITRE ATT&CK tactic transition weights. **Direct parallel to Murmur's discovery directionality gap:** `mine_candidate_pairs()` finds co-occurrence, not causation. Zone-transition weights (e.g., IDENTITY→SECRET is higher-signal than DATA→DATA) could replace flat pair mining. Deferred to Thread 3.
+
+---
+
 ## Phase 1: Signal Refinement (2-3 weeks after MVP)
 
 ### 1.1 sigma_relative / EMA Baseline Experiment

@@ -9,6 +9,7 @@ class Actor:
     home_zone: str
     action_types: list[str]
 
+
 class ActorPopulation:
     ROLE_TEMPLATES = {
         "admin": {
@@ -18,15 +19,16 @@ class ActorPopulation:
                 "IAM_CREATE_SA",
                 "SCHEDULER_ADMIN",
                 "COMPUTE_CREATE",
+                "COMPUTE_METADATA_CHANGE",
             ],
         },
         "deployer": {
             "home_zone": "CONTROL",
-            "action_types": ["COMPUTE_CREATE", "IAM_SET_POLICY", "GCS_READ", "GCS_WRITE"],
+            "action_types": ["COMPUTE_CREATE", "IAM_SET_POLICY", "GCS_READ", "GCS_WRITE", "KMS_ENCRYPT", "KMS_DECRYPT"],
         },
         "scheduler": {
             "home_zone": "CONTROL",
-            "action_types": ["SCHEDULER_ADMIN", "IAM_IMPERSONATE", "GCS_READ"],
+            "action_types": ["SCHEDULER_ADMIN", "IAM_IMPERSONATE", "GCS_READ", "KMS_DECRYPT"],
         },
         "worker": {
             "home_zone": "DATA",
@@ -36,6 +38,7 @@ class ActorPopulation:
                 "GCS_LIST",
                 "SECRET_ACCESS",
                 "BQ_JOB_SUBMIT",
+                "KMS_DECRYPT",
             ],
         },
         "attacker": {
@@ -65,7 +68,7 @@ class ActorPopulation:
         roles.extend(["attacker"] * attacker_count)
         self.rng.shuffle(roles)
 
-        for i, role in enumerate(roles[:self.count]):
+        for i, role in enumerate(roles[: self.count]):
             template = self.ROLE_TEMPLATES[role]
             email = f"{role}-sa-{i}@synth-project.iam.gserviceaccount.com"
             self.actors.append(Actor(email, role, template["home_zone"], template["action_types"]))

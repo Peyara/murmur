@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from src.synthetic.actors import ActorPopulation
 from src.synthetic.provenance import ProvenanceGenerator
 from src.synthetic.temporal import TemporalEngine
-from src.synthetic.workflows import WorkflowTemplates
+from src.synthetic.workflows import NOISE_ACTIONS, WorkflowTemplates
 
 
 class TrajectoryComposer:
@@ -45,33 +45,34 @@ class TrajectoryComposer:
         self.events.sort(key=lambda e: e["timestamp"])
         return self.events
 
-    def _generate_benign_window(
-        self, window_start: datetime, window_end: datetime
-    ):
+    def _generate_benign_window(self, window_start: datetime, window_end: datetime):
         workflow_count = self.rng.randint(1, 2)
         for _ in range(workflow_count):
-            workflow_template = self.rng.choice(
-                WorkflowTemplates.get_benign_workflows()
-            )
+            workflow_template = self.rng.choice(WorkflowTemplates.get_benign_workflows())
             actor = self.rng.choice(self.actors.get_by_role("worker"))
             scheduler_actor = None
             if self.rng.random() < 0.5:
                 sched = self.rng.choice(self.actors.get_by_role("scheduler"))
                 scheduler_actor = sched if sched else None
-            workflow_start = self.temporal.uniform_random_time(
-                window_start, window_end
-            )
-            sched_email = (
-                scheduler_actor.email if scheduler_actor else actor.email
-            )
+
+            # Temporal: benign workflows use burst_cluster (tight execution)
+            # or scheduled_periodic depending on whether scheduler is involved
+            step_count = len(workflow_template)
+            if scheduler_actor:
+                # Scheduled jobs fire in a tight cluster
+                timestamps = self.temporal.burst_cluster(window_start, window_end, count=step_count, spread_sec=15)
+            else:
+                # Ad-hoc benign work — still clustered but slightly wider
+                timestamps = self.temporal.burst_cluster(window_start, window_end, count=step_count, spread_sec=30)
+
+            sched_email = scheduler_actor.email if scheduler_actor else actor.email
             trigger_ref = self.provenance.benign_trigger_ref(sched_email)
-            for step in workflow_template:
-                event_time = workflow_start + timedelta(seconds=step.offset_sec)
+
+            for i, step in enumerate(workflow_template):
+                event_time = timestamps[i] if i < len(timestamps) else timestamps[-1]
                 if event_time >= window_end:
                     continue
-                delegated_email = (
-                    scheduler_actor.email if scheduler_actor else None
-                )
+                delegated_email = scheduler_actor.email if scheduler_actor else None
                 event = self._create_raw_event(
                     actor.email,
                     step.service_name,
@@ -84,22 +85,36 @@ class TrajectoryComposer:
                 )
                 self.events.append(event)
 
-    def _generate_attack_window(
-        self, window_start: datetime, window_end: datetime
-    ):
+    def _generate_attack_window(self, window_start: datetime, window_end: datetime):
         workflow_count = self.rng.randint(1, 2)
         for _ in range(workflow_count):
-            workflow_template = self.rng.choice(
-                WorkflowTemplates.get_attack_workflows()
-            )
+            workflow_template = self.rng.choice(WorkflowTemplates.get_attack_workflows())
             actor = self.rng.choice(self.actors.get_by_role("attacker"))
             if not actor:
                 actor = self.rng.choice(self.actors.get_all())
-            workflow_start = self.temporal.uniform_random_time(
-                window_start, window_end
-            )
-            for step in workflow_template:
-                event_time = workflow_start + timedelta(seconds=step.offset_sec)
+
+            step_count = len(workflow_template)
+
+            # Temporal: attacks use burst_cluster (smash-and-grab) or
+            # stealth_spread (patient escalation) based on workflow length
+            if step_count <= 2:
+                # Short attacks are fast bursts (M-Trends 22s handoff)
+                timestamps = self.temporal.burst_cluster(window_start, window_end, count=step_count, spread_sec=30)
+            else:
+                # Longer chains use stealth spread (IAM propagation delay)
+                timestamps = self.temporal.stealth_spread(window_start, window_end, count=step_count, min_gap_sec=120)
+
+            # Provenance: attacks have degraded or missing provenance
+            provenance_choice = self.rng.random()
+            if provenance_choice < 0.5:
+                trigger_ref = self.provenance.no_trigger_ref()
+            elif provenance_choice < 0.8:
+                trigger_ref = self.provenance.forged_trigger_ref(actor.email)
+            else:
+                trigger_ref = self.provenance.partial_trigger_ref(actor.email)
+
+            for i, step in enumerate(workflow_template):
+                event_time = timestamps[i] if i < len(timestamps) else timestamps[-1]
                 if event_time >= window_end:
                     continue
                 event = self._create_raw_event(
@@ -109,64 +124,37 @@ class TrajectoryComposer:
                     step.resource_pattern,
                     event_time,
                     step.log_name_suffix,
-                    None,
+                    trigger_ref,
                 )
                 self.events.append(event)
 
-    def _generate_background_noise(
-        self, window_start: datetime, window_end: datetime
-    ):
+    def _generate_background_noise(self, window_start: datetime, window_end: datetime):
         noise_count = self.rng.randint(5, 10)
         for _ in range(noise_count):
             actor = self.rng.choice(self.actors.get_all())
-            event_time = self.temporal.uniform_random_time(
-                window_start, window_end
-            )
+            event_time = self.temporal.uniform_random_time(window_start, window_end)
             scheduler_actor = None
             if self.rng.random() < 0.4:
                 sched = self.rng.choice(self.actors.get_by_role("scheduler"))
                 scheduler_actor = sched if sched else None
             trigger_ref = None
             if self.rng.random() < 0.7:
-                sched_email = (
-                    scheduler_actor.email if scheduler_actor else actor.email
-                )
+                sched_email = scheduler_actor.email if scheduler_actor else actor.email
                 trigger_ref = self.provenance.benign_trigger_ref(sched_email)
-            action = self.rng.choice(["gcs_read", "bq_query", "gcs_list"])
+
+            # Use expanded NOISE_ACTIONS instead of hardcoded 3 actions
+            service_name, method_name, resource_pattern, _target_zone, log_suffix = self.rng.choice(NOISE_ACTIONS)
             delegated_email = scheduler_actor.email if scheduler_actor else None
-            if action == "gcs_read":
-                event = self._create_raw_event(
-                    actor.email,
-                    "storage.googleapis.com",
-                    "storage.objects.get",
-                    "projects/_/buckets/data-bucket/objects/file.csv",
-                    event_time,
-                    "data_access",
-                    trigger_ref,
-                    delegated_email,
-                )
-            elif action == "bq_query":
-                event = self._create_raw_event(
-                    actor.email,
-                    "bigquery.googleapis.com",
-                    "jobservice.insert",
-                    "projects/synth-project/jobs/query-noise",
-                    event_time,
-                    "activity",
-                    trigger_ref,
-                    delegated_email,
-                )
-            else:
-                event = self._create_raw_event(
-                    actor.email,
-                    "storage.googleapis.com",
-                    "storage.objects.list",
-                    "projects/_/buckets/data-bucket",
-                    event_time,
-                    "data_access",
-                    None,
-                    None,
-                )
+            event = self._create_raw_event(
+                actor.email,
+                service_name,
+                method_name,
+                resource_pattern,
+                event_time,
+                log_suffix,
+                trigger_ref,
+                delegated_email,
+            )
             self.events.append(event)
 
     def _create_raw_event(
@@ -185,9 +173,7 @@ class TrajectoryComposer:
         ts_str = timestamp.isoformat(timespec="milliseconds") + "Z"
         auth_info = {"principalEmail": actor_email}
         if delegated_from_email:
-            delegation_info = {
-                "firstPartyPrincipal": {"principalEmail": delegated_from_email}
-            }
+            delegation_info = {"firstPartyPrincipal": {"principalEmail": delegated_from_email}}
             auth_info["serviceAccountDelegationInfo"] = [delegation_info]
 
         # Determine resource type based on resource_name
@@ -219,10 +205,7 @@ class TrajectoryComposer:
             },
             "timestamp": ts_str,
             "insertId": insert_id,
-            "logName": (
-                f"projects/synth-project/logs/"
-                f"cloudaudit.googleapis.com%2F{log_name_suffix}"
-            ),
+            "logName": (f"projects/synth-project/logs/cloudaudit.googleapis.com%2F{log_name_suffix}"),
         }
         if trigger_ref:
             event["metadata"] = {"trigger_ref": trigger_ref}
