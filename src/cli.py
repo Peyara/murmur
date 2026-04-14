@@ -113,9 +113,7 @@ def window(db_path: str | None, window_start: str | None):
         if window_start:
             windows = [(datetime.fromisoformat(window_start),)]
         else:
-            windows = conn.execute(
-                "SELECT DISTINCT window_start FROM events ORDER BY window_start"
-            ).fetchall()
+            windows = conn.execute("SELECT DISTINCT window_start FROM events ORDER BY window_start").fetchall()
 
         total_actors = 0
         total_edges = 0
@@ -127,8 +125,7 @@ def window(db_path: str | None, window_start: str | None):
             total_edges += edges
 
         click.echo(
-            f"Window complete: {len(windows)} windows, "
-            f"{total_actors} actor-window rows, {total_edges} edge rows"
+            f"Window complete: {len(windows)} windows, {total_actors} actor-window rows, {total_edges} edge rows"
         )
     finally:
         conn.close()
@@ -143,11 +140,18 @@ def score(db_path: str | None, window_start: str | None):
 
     from src.provenance.patterns import list_patterns
     from src.provenance.residual import compute_residual_risk
+    from src.score.closure import mine_candidate_pairs, promote_candidates
     from src.score.fusion import compute_fusion
 
     db_path = db_path or SETTINGS.db_path
     conn = duckdb.connect(db_path)
     try:
+        # Discover and promote closure pairs before scoring
+        candidates = mine_candidate_pairs(conn)
+        promoted = promote_candidates(conn)
+        if candidates or promoted:
+            click.echo(f"Closure discovery: {len(candidates)} candidates, {promoted} promoted")
+
         known = SETTINGS.load_known_initiators()
         cached_patterns = list_patterns(conn, include_inactive=False)
 
@@ -157,15 +161,14 @@ def score(db_path: str | None, window_start: str | None):
                 [datetime.fromisoformat(window_start)],
             ).fetchall()
         else:
-            pairs = conn.execute(
-                "SELECT window_start, actor_id FROM actor_windows ORDER BY window_start"
-            ).fetchall()
+            pairs = conn.execute("SELECT window_start, actor_id FROM actor_windows ORDER BY window_start").fetchall()
 
         residuals = []
         for ws, actor_id in pairs:
             fusion_raw = compute_fusion(conn, ws, actor_id, known)
-            residual = compute_residual_risk(conn, ws, actor_id, fusion_raw, known, SETTINGS,
-                                             cached_patterns=cached_patterns)
+            residual = compute_residual_risk(
+                conn, ws, actor_id, fusion_raw, known, SETTINGS, cached_patterns=cached_patterns
+            )
             residuals.append(residual)
 
         # residual_risk is [0, 1]; settings thresholds are on [0, 10] scale.
@@ -173,10 +176,7 @@ def score(db_path: str | None, window_start: str | None):
         med_t = SETTINGS.alert_med_threshold / 10.0
         high = sum(1 for r in residuals if r >= high_t)
         med = sum(1 for r in residuals if med_t <= r < high_t)
-        click.echo(
-            f"Score complete: {len(residuals)} (window, actor) pairs scored. "
-            f"High: {high}, Medium: {med}"
-        )
+        click.echo(f"Score complete: {len(residuals)} (window, actor) pairs scored. High: {high}, Medium: {med}")
     finally:
         conn.close()
 
@@ -207,8 +207,16 @@ def register_pattern_cmd(db_path, name, description, initiator_type, actors, zon
         if rate_min > rate_max:
             raise click.UsageError(f"--rate-min ({rate_min}) must be <= --rate-max ({rate_max}).")
         pid = register_pattern(
-            conn, name, description, initiator_type,
-            actor_list, zone_list, None, rate_min, rate_max, duration,
+            conn,
+            name,
+            description,
+            initiator_type,
+            actor_list,
+            zone_list,
+            None,
+            rate_min,
+            rate_max,
+            duration,
         )
         click.echo(f"Pattern registered: {pid} ({name})")
     finally:
@@ -267,9 +275,7 @@ def show_trigger_chain_cmd(event_id, db_path):
     conn = duckdb.connect(db_path)
     try:
         known = SETTINGS.load_known_initiators()
-        row = conn.execute(
-            "SELECT trigger_ref FROM events WHERE event_id = ?", [event_id]
-        ).fetchone()
+        row = conn.execute("SELECT trigger_ref FROM events WHERE event_id = ?", [event_id]).fetchone()
         if not row:
             click.echo(f"Event {event_id} not found.", err=True)
             sys.exit(1)
@@ -288,11 +294,13 @@ def show_trigger_chain_cmd(event_id, db_path):
 @click.option("--scenario", type=click.Path(exists=True, dir_okay=False), help="Run a single scenario JSONL file.")
 @click.option("--all", "run_all", is_flag=True, help="Run all scenarios in data/benchmark/.")
 @click.option(
-    "--history", type=click.Path(exists=True, dir_okay=False),
+    "--history",
+    type=click.Path(exists=True, dir_okay=False),
     help="History JSONL to seed (for benign scenarios).",
 )
 @click.option(
-    "--patterns-json", type=click.Path(exists=True, dir_okay=False),
+    "--patterns-json",
+    type=click.Path(exists=True, dir_okay=False),
     help="JSON file with sanctioned patterns to register.",
 )
 def benchmark(scenario: str | None, run_all: bool, history: str | None, patterns_json: str | None):
@@ -358,6 +366,7 @@ def inspect(directory: str, cluster_window: float):
 def generate(actors: int, windows: int, attack_ratio: float, seed: int, output: str):
     """Generate synthetic GCP audit log trajectory."""
     from src.synthetic import generate_trajectory
+
     try:
         if actors < 5 or actors > 50:
             raise click.BadParameter("--actors must be between 5 and 50")
@@ -367,14 +376,9 @@ def generate(actors: int, windows: int, attack_ratio: float, seed: int, output: 
             raise click.BadParameter("--attack-ratio must be between 0.0 and 1.0")
         output_path = Path(output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        msg = (
-            f"Generating trajectory: {actors} actors, {windows} windows, "
-            f"attack_ratio={attack_ratio}, seed={seed}"
-        )
+        msg = f"Generating trajectory: {actors} actors, {windows} windows, attack_ratio={attack_ratio}, seed={seed}"
         click.echo(msg)
-        events = generate_trajectory(
-            actors=actors, windows=windows, attack_ratio=attack_ratio, seed=seed
-        )
+        events = generate_trajectory(actors=actors, windows=windows, attack_ratio=attack_ratio, seed=seed)
         click.echo(f"Generated {len(events)} events")
         with open(output_path, "w") as f:
             for event in events:
