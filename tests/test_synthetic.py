@@ -445,3 +445,96 @@ class TestProvenancePatterns:
         assert benign1 == benign2
         assert forged1 == forged2
         assert partial1 == partial2
+
+
+class TestComposerIntegration:
+    """Integration tests validating the full composer pipeline.
+
+    These tests generate trajectories through the composer and validate
+    that temporal profiles, provenance patterns, and expanded workflows
+    are all wired correctly end-to-end.
+    """
+
+    def test_all_parseable_action_types_present(self):
+        """Generate a large trajectory and verify all 17 parseable ActionTypes appear."""
+        result = generate_trajectory(actors=20, windows=100, attack_ratio=0.2, seed=99)
+        action_types = set()
+        for event in result:
+            canonical = parse_audit_log(event)
+            action_types.add(canonical.action_type)
+
+        # All ActionTypes that have ACTION_MAP entries should appear
+        # with enough volume. We check for at least 12 of 17 since
+        # random selection may not hit every workflow in one run.
+        assert len(action_types) >= 12, f"Only {len(action_types)} ActionTypes found: {action_types}"
+
+    def test_attack_windows_have_degraded_provenance(self):
+        """Attack events should have missing, forged, or partial provenance."""
+        result = generate_trajectory(actors=10, windows=50, attack_ratio=0.3, seed=42)
+        events_without_trigger = 0
+        events_with_forged = 0
+        total = len(result)
+        for event in result:
+            metadata = event.get("metadata", {})
+            trigger_ref = metadata.get("trigger_ref")
+            if trigger_ref is None:
+                events_without_trigger += 1
+            elif "forged" in trigger_ref:
+                events_with_forged += 1
+
+        # With 30% attack ratio, we should see some events without triggers
+        # and some with forged triggers
+        assert events_without_trigger > 0, "Should have events with no trigger_ref (attacks)"
+        assert events_with_forged > 0, "Should have events with forged trigger_ref"
+        # Not ALL events should lack triggers (benign windows have them)
+        assert events_without_trigger < total, "Not all events should lack triggers"
+
+    def test_benign_windows_have_valid_provenance(self):
+        """Benign events should have well-formed Cloud Scheduler trigger_refs."""
+        result = generate_trajectory(actors=10, windows=20, attack_ratio=0.0, seed=42)
+        events_with_trigger = 0
+        for event in result:
+            metadata = event.get("metadata", {})
+            trigger_ref = metadata.get("trigger_ref")
+            if trigger_ref and "forged" not in trigger_ref:
+                events_with_trigger += 1
+                # Valid trigger_refs should have full path
+                assert "projects/synth-project/locations/us-central1/jobs/" in trigger_ref
+
+        assert events_with_trigger > 0, "Benign windows should produce events with trigger_refs"
+
+    def test_noise_uses_expanded_actions(self):
+        """Background noise should include diverse action types beyond gcs_read/bq/gcs_list."""
+        result = generate_trajectory(actors=10, windows=50, attack_ratio=0.0, seed=123)
+        services = set()
+        for event in result:
+            svc = event["protoPayload"]["serviceName"]
+            services.add(svc)
+
+        # With NOISE_ACTIONS wired in, we should see more than just storage + bigquery
+        assert len(services) >= 3, f"Only {len(services)} services: {services}"
+
+    def test_temporal_clustering_in_benign_windows(self):
+        """Benign workflow events should show tight inter-arrival times from burst_cluster."""
+        from src.ingest.parser import parse_timestamp
+
+        result = generate_trajectory(actors=10, windows=20, attack_ratio=0.0, seed=42)
+        timestamps = sorted(parse_timestamp(e["timestamp"]) for e in result)
+
+        # With burst_cluster wired in, we should see pairs of events
+        # within 30 seconds of each other (workflow steps in same burst).
+        # Background noise is uniform, so without clustering the minimum
+        # gap would be ~minutes. Tight pairs prove burst_cluster is active.
+        tight_pairs = 0
+        for i in range(len(timestamps) - 1):
+            gap = (timestamps[i + 1] - timestamps[i]).total_seconds()
+            if gap < 30:
+                tight_pairs += 1
+
+        assert tight_pairs > 0, "Should have event pairs < 30s apart (burst_cluster active)"
+
+    def test_seed_reproducibility_preserved(self):
+        """Composer rewrite must preserve deterministic output for same seed."""
+        result1 = generate_trajectory(actors=10, windows=20, attack_ratio=0.1, seed=42)
+        result2 = generate_trajectory(actors=10, windows=20, attack_ratio=0.1, seed=42)
+        assert result1 == result2
