@@ -1,12 +1,17 @@
 """Tests for closure signal ablation study."""
 
+import math
 
 from src.score.ablation import (
     AblationResult,
+    RoleBasedStats,
     ScoredRow,
     assign_tier,
     compute_fusion_with_weights,
+    compute_role_stats,
+    extract_role,
     format_tier_matrix,
+    generate_report,
     reweight,
     run_ablation,
 )
@@ -180,3 +185,135 @@ class TestStats:
         s = result.stats
         assert abs(s["mean"] - (0.1 + 0.2 + 0.05) / 3) < 1e-10
         assert s["max"] == 0.2
+
+
+# ── Role-based analysis tests ──────────────────────────────────
+
+
+class TestExtractRole:
+    def test_synthetic_attacker(self):
+        assert extract_role("attacker-sa-5@synth-project.iam.gserviceaccount.com") == "attacker"
+
+    def test_synthetic_worker(self):
+        assert extract_role("worker-sa-12@synth-project.iam.gserviceaccount.com") == "worker"
+
+    def test_synthetic_admin(self):
+        assert extract_role("admin-sa-0@synth-project.iam.gserviceaccount.com") == "admin"
+
+    def test_synthetic_scheduler(self):
+        assert extract_role("scheduler-sa-3@synth-project.iam.gserviceaccount.com") == "scheduler"
+
+    def test_non_synthetic_fallback(self):
+        assert extract_role("real-user@example.com") == "unknown"
+
+    def test_empty_string(self):
+        assert extract_role("") == "unknown"
+
+
+class TestComputeRoleStats:
+    def test_groups_by_role(self):
+        baseline = [
+            _make_row(actor_id="attacker-sa-0@synth", fusion_raw=0.5),
+            _make_row(actor_id="attacker-sa-1@synth", fusion_raw=0.6),
+            _make_row(actor_id="worker-sa-0@synth", fusion_raw=0.2),
+            _make_row(actor_id="worker-sa-1@synth", fusion_raw=0.3),
+            _make_row(actor_id="worker-sa-2@synth", fusion_raw=0.25),
+        ]
+        zero = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "zero")
+        redist = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "redistribute")
+        stats = compute_role_stats(baseline, zero, redist)
+
+        assert "attacker" in stats
+        assert "worker" in stats
+        assert stats["attacker"].count == 2
+        assert stats["worker"].count == 3
+
+    def test_per_role_means(self):
+        baseline = [
+            _make_row(actor_id="attacker-sa-0@synth", fusion_raw=0.4),
+            _make_row(actor_id="attacker-sa-1@synth", fusion_raw=0.6),
+            _make_row(actor_id="worker-sa-0@synth", fusion_raw=0.2),
+            _make_row(actor_id="worker-sa-1@synth", fusion_raw=0.3),
+        ]
+        zero = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "zero")
+        redist = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "redistribute")
+        stats = compute_role_stats(baseline, zero, redist)
+
+        assert abs(stats["attacker"].baseline_mean - 0.5) < 1e-10
+        assert abs(stats["worker"].baseline_mean - 0.25) < 1e-10
+
+    def test_gap_metric(self):
+        baseline = [
+            _make_row(actor_id="attacker-sa-0@synth", fusion_raw=0.6),
+            _make_row(actor_id="attacker-sa-1@synth", fusion_raw=0.6),
+            _make_row(actor_id="worker-sa-0@synth", fusion_raw=0.3),
+            _make_row(actor_id="worker-sa-1@synth", fusion_raw=0.3),
+        ]
+        zero = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "zero")
+        redist = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "redistribute")
+        stats = compute_role_stats(baseline, zero, redist)
+
+        # attacker_mean / worker_mean = 0.6 / 0.3 = 2.0
+        assert abs(stats["attacker"].gap_baseline - 2.0) < 0.01
+
+    def test_gap_nan_without_workers(self):
+        baseline = [
+            _make_row(actor_id="attacker-sa-0@synth", fusion_raw=0.5),
+            _make_row(actor_id="admin-sa-0@synth", fusion_raw=0.3),
+        ]
+        zero = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "zero")
+        redist = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "redistribute")
+        stats = compute_role_stats(baseline, zero, redist)
+
+        assert math.isnan(stats["attacker"].gap_baseline)
+
+    def test_closure_activation_pct(self):
+        baseline = [
+            _make_row(actor_id="attacker-sa-0@synth", closure_ratio=0.5, orphaned_privilege=5.0, fusion_raw=0.3),
+            _make_row(actor_id="attacker-sa-1@synth", closure_ratio=1.0, orphaned_privilege=0.0, fusion_raw=0.2),
+        ]
+        zero = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "zero")
+        redist = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "redistribute")
+        stats = compute_role_stats(baseline, zero, redist)
+
+        # 1 of 2 has closure_gap > 0.001 (closure_ratio=0.5 → gap=0.5)
+        assert abs(stats["attacker"].closure_gap_active_pct - 50.0) < 0.1
+        # 1 of 2 has orphaned_priv > 0.001
+        assert abs(stats["attacker"].orphaned_priv_active_pct - 50.0) < 0.1
+
+    def test_single_row_per_role_no_crash(self):
+        baseline = [
+            _make_row(actor_id="attacker-sa-0@synth", fusion_raw=0.5),
+            _make_row(actor_id="worker-sa-0@synth", fusion_raw=0.3),
+        ]
+        zero = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "zero")
+        redist = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "redistribute")
+        stats = compute_role_stats(baseline, zero, redist)
+
+        # Single row → stdev should be 0.0, not crash
+        assert stats["attacker"].baseline_stdev == 0.0
+        assert stats["worker"].count == 1
+
+
+class TestGenerateReportRoles:
+    def test_report_includes_role_section(self):
+        baseline = [
+            _make_row(actor_id="attacker-sa-0@synth", fusion_raw=0.5),
+            _make_row(actor_id="worker-sa-0@synth", fusion_raw=0.3),
+        ]
+        zero = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "zero")
+        redist = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "redistribute")
+        report = generate_report(baseline, zero, redist, ":memory:", include_role_analysis=True)
+
+        assert "## Role-Based Analysis" in report
+        assert "attacker" in report
+        assert "worker" in report
+
+    def test_report_backward_compatible(self):
+        baseline = [_make_row(fusion_raw=0.1)]
+        zero = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "zero")
+        redist = run_ablation(baseline, ["closure_gap", "orphaned_priv"], "redistribute")
+        report = generate_report(baseline, zero, redist, ":memory:", include_role_analysis=False)
+
+        assert "## Method" in report
+        assert "## Role-Based Analysis" not in report
