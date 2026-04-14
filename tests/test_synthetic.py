@@ -446,6 +446,36 @@ class TestProvenancePatterns:
         assert forged1 == forged2
         assert partial1 == partial2
 
+    def test_benign_trigger_ref_reuses_jobs(self):
+        """benign_trigger_ref should reuse trigger_refs for the same role (recurring jobs)."""
+        gen = ProvenanceGenerator(seed=42)
+        refs = [gen.benign_trigger_ref("worker-sa-0@synth.iam") for _ in range(20)]
+        unique = set(refs)
+        # With pooling, 20 calls for the same role should produce far fewer than 20 unique refs
+        assert len(unique) < 10, f"Expected reuse but got {len(unique)} unique refs from 20 calls"
+        # But should still have some variety (not all the same)
+        assert len(unique) > 1, "Pool should contain multiple jobs, not just one"
+
+    def test_benign_trigger_ref_pools_per_role(self):
+        """Different roles should have independent job pools."""
+        gen = ProvenanceGenerator(seed=42)
+        worker_refs = {gen.benign_trigger_ref("worker-sa-0@synth.iam") for _ in range(10)}
+        admin_refs = {gen.benign_trigger_ref("admin-sa-0@synth.iam") for _ in range(10)}
+        # Pools should be independent — worker jobs contain "worker", admin contain "admin"
+        for ref in worker_refs:
+            assert "trigger-worker-" in ref
+        for ref in admin_refs:
+            assert "trigger-admin-" in ref
+
+    def test_benign_trigger_ref_pool_bounded(self):
+        """Job pool per role should not grow unbounded."""
+        gen = ProvenanceGenerator(seed=42)
+        # Generate many refs for one role
+        refs = [gen.benign_trigger_ref("scheduler-sa-0@synth.iam") for _ in range(50)]
+        unique = set(refs)
+        # Pool should cap at a reasonable size (≤ 5 per role)
+        assert len(unique) <= 5, f"Pool grew to {len(unique)}, expected ≤ 5"
+
 
 class TestComposerIntegration:
     """Integration tests validating the full composer pipeline.

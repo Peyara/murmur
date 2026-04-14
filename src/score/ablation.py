@@ -15,7 +15,9 @@ differ only if the non-zeroed weights were non-proportional to each other.
 Read-only from production DB. All recomputation is in-memory.
 """
 
+import math
 import statistics
+from collections import defaultdict
 from dataclasses import dataclass
 
 import duckdb
@@ -33,6 +35,37 @@ from src.score.fusion import (
 TIER_THRESHOLDS = {"HIGH": 0.8, "MEDIUM": 0.5}
 # WATCH threshold: anything > 0 that isn't MEDIUM or HIGH
 WATCH_FLOOR = 0.005
+
+
+def extract_role(actor_id: str) -> str:
+    """Extract role from synthetic actor_id (e.g., 'worker-sa-3@...' → 'worker')."""
+    try:
+        prefix = actor_id.split("-sa-")[0]
+        if prefix and prefix != actor_id:
+            return prefix
+    except (IndexError, AttributeError):
+        pass
+    return "unknown"
+
+
+@dataclass
+class RoleBasedStats:
+    """Per-role aggregated ablation metrics."""
+    role: str
+    count: int
+    baseline_mean: float
+    baseline_stdev: float
+    zero_mean: float
+    zero_stdev: float
+    redist_mean: float
+    redist_stdev: float
+    gap_baseline: float
+    gap_zero: float
+    gap_redist: float
+    closure_gap_active_pct: float
+    orphaned_priv_active_pct: float
+    tier_changes_zero: int
+    tier_changes_redist: int
 
 
 def assign_tier(fusion_raw: float) -> str:
@@ -186,6 +219,98 @@ def run_ablation(
     return AblationResult(mode=mode, weights=new_weights, rows=rows, deltas=deltas)
 
 
+def compute_role_stats(
+    baseline: list[ScoredRow],
+    zero_result: AblationResult,
+    redist_result: AblationResult,
+) -> dict[str, RoleBasedStats]:
+    """Group ablation results by role and compute per-role metrics."""
+    # Index ablation rows by (window_start, actor_id) for lookup
+    zero_by_key: dict[tuple[str, str], tuple] = {}
+    for row, new_f, old_t, new_t in zero_result.rows:
+        zero_by_key[(row.window_start, row.actor_id)] = (new_f, old_t, new_t)
+
+    redist_by_key: dict[tuple[str, str], tuple] = {}
+    for row, new_f, old_t, new_t in redist_result.rows:
+        redist_by_key[(row.window_start, row.actor_id)] = (new_f, old_t, new_t)
+
+    # Group baseline rows by role
+    groups: dict[str, list[int]] = defaultdict(list)
+    for i, row in enumerate(baseline):
+        role = extract_role(row.actor_id)
+        groups[role].append(i)
+
+    def _safe_stdev(vals: list[float]) -> float:
+        return statistics.stdev(vals) if len(vals) > 1 else 0.0
+
+    # Compute worker mean for gap metric
+    worker_indices = groups.get("worker", [])
+    worker_baseline_mean = (
+        statistics.mean([baseline[i].fusion_raw for i in worker_indices])
+        if worker_indices else 0.0
+    )
+    worker_zero_mean = (
+        statistics.mean([zero_by_key[(baseline[i].window_start, baseline[i].actor_id)][0] for i in worker_indices])
+        if worker_indices else 0.0
+    )
+    worker_redist_mean = (
+        statistics.mean([redist_by_key[(baseline[i].window_start, baseline[i].actor_id)][0] for i in worker_indices])
+        if worker_indices else 0.0
+    )
+
+    result = {}
+    for role, indices in groups.items():
+        rows = [baseline[i] for i in indices]
+        b_fusions = [r.fusion_raw for r in rows]
+        z_fusions = [zero_by_key[(r.window_start, r.actor_id)][0] for r in rows]
+        r_fusions = [redist_by_key[(r.window_start, r.actor_id)][0] for r in rows]
+
+        b_mean = statistics.mean(b_fusions)
+        z_mean = statistics.mean(z_fusions)
+        rd_mean = statistics.mean(r_fusions)
+
+        # Gap = this_role_mean / worker_mean
+        has_workers = bool(worker_indices) and worker_baseline_mean > 0
+        gap_b = b_mean / worker_baseline_mean if has_workers else math.nan
+        gap_z = z_mean / worker_zero_mean if has_workers and worker_zero_mean > 0 else math.nan
+        gap_r = rd_mean / worker_redist_mean if has_workers and worker_redist_mean > 0 else math.nan
+
+        # Closure activation
+        cg_active = sum(1 for r in rows if (1.0 - r.closure_ratio) > 0.001)
+        op_active = sum(1 for r in rows if r.orphaned_privilege > 0.001)
+        n = len(rows)
+
+        # Tier changes
+        tc_zero = sum(
+            1 for r in rows
+            if zero_by_key[(r.window_start, r.actor_id)][1] != zero_by_key[(r.window_start, r.actor_id)][2]
+        )
+        tc_redist = sum(
+            1 for r in rows
+            if redist_by_key[(r.window_start, r.actor_id)][1] != redist_by_key[(r.window_start, r.actor_id)][2]
+        )
+
+        result[role] = RoleBasedStats(
+            role=role,
+            count=n,
+            baseline_mean=b_mean,
+            baseline_stdev=_safe_stdev(b_fusions),
+            zero_mean=z_mean,
+            zero_stdev=_safe_stdev(z_fusions),
+            redist_mean=rd_mean,
+            redist_stdev=_safe_stdev(r_fusions),
+            gap_baseline=gap_b,
+            gap_zero=gap_z,
+            gap_redist=gap_r,
+            closure_gap_active_pct=100.0 * cg_active / n,
+            orphaned_priv_active_pct=100.0 * op_active / n,
+            tier_changes_zero=tc_zero,
+            tier_changes_redist=tc_redist,
+        )
+
+    return result
+
+
 def format_tier_matrix(migrations: dict[tuple[str, str], int]) -> str:
     """Format tier migration as a markdown table."""
     tiers = ["NORMAL", "WATCH", "MEDIUM", "HIGH"]
@@ -205,6 +330,7 @@ def generate_report(
     zero_result: AblationResult,
     redist_result: AblationResult,
     db_path: str,
+    include_role_analysis: bool = True,
 ) -> str:
     """Generate markdown ablation report."""
     n = len(baseline)
@@ -393,4 +519,82 @@ pairs to determine if the pairs that change tier are ones where closure
 *should* matter (attack scenarios with unclosed privilege grants)
 vs. ones where it's noise.
 """
+
+    if include_role_analysis and n > 0:
+        role_stats = compute_role_stats(baseline, zero_result, redist_result)
+        sorted_roles = sorted(role_stats.keys(), key=lambda r: role_stats[r].baseline_mean, reverse=True)
+
+        # Per-role fusion table
+        role_rows = []
+        for role in sorted_roles:
+            s = role_stats[role]
+            role_rows.append(
+                f"| {role} | {s.count} | {s.baseline_mean:.4f} | "
+                f"{s.zero_mean:.4f} | {s.redist_mean:.4f} | "
+                f"{s.baseline_stdev:.4f} |"
+            )
+
+        # Gap table (attacker vs worker)
+        atk = role_stats.get("attacker")
+        gap_rows = ""
+        if atk and not math.isnan(atk.gap_baseline):
+            gap_b_pct = (atk.gap_baseline - 1.0) * 100
+            gap_z_pct = (atk.gap_zero - 1.0) * 100
+            gap_r_pct = (atk.gap_redist - 1.0) * 100
+            delta_z = gap_z_pct - gap_b_pct
+            delta_r = gap_r_pct - gap_b_pct
+            gap_rows = f"""| Baseline | {atk.gap_baseline:.3f} ({gap_b_pct:+.1f}%) | — | — |
+| Zero ablation | {atk.gap_zero:.3f} ({gap_z_pct:+.1f}%) | {delta_z:+.1f}pp | {100*delta_z/gap_b_pct:.1f}% |
+| Redistribute | {atk.gap_redist:.3f} ({gap_r_pct:+.1f}%) | {delta_r:+.1f}pp | {100*delta_r/gap_b_pct:.1f}% |"""
+        else:
+            gap_rows = "No attacker+worker roles found — gap metric unavailable."
+
+        # Activation by role table
+        act_rows = []
+        for role in sorted_roles:
+            s = role_stats[role]
+            act_rows.append(
+                f"| {role} | {s.count} | {s.closure_gap_active_pct:.1f}% | "
+                f"{s.orphaned_priv_active_pct:.1f}% |"
+            )
+
+        # Tier stability by role
+        tier_rows = []
+        for role in sorted_roles:
+            s = role_stats[role]
+            pct = 100.0 * s.tier_changes_zero / s.count if s.count > 0 else 0.0
+            tier_rows.append(
+                f"| {role} | {s.count} | {s.tier_changes_zero} | {pct:.1f}% |"
+            )
+
+        report += f"""
+## Role-Based Analysis
+
+### Fusion score by role
+
+| Role | Count | Baseline Mean | Zero Mean | Redist Mean | Baseline Std |
+|------|-------|---------------|-----------|-------------|--------------|
+{chr(10).join(role_rows)}
+
+### Attacker vs Worker Gap
+
+Gap = attacker_mean / worker_mean. A gap of 1.70 means attackers average 70% higher fusion scores.
+
+| Scenario | Gap (ratio) | Change from Baseline | % of Gap |
+|----------|-------------|----------------------|----------|
+{gap_rows}
+
+### Closure Signal Activation by Role
+
+| Role | Count | Closure Gap Active | Orphaned Priv Active |
+|------|-------|--------------------|----------------------|
+{chr(10).join(act_rows)}
+
+### Tier Stability by Role (Zero Ablation)
+
+| Role | Count | Tier Changes | % Changed |
+|------|-------|--------------|-----------|
+{chr(10).join(tier_rows)}
+"""
+
     return report

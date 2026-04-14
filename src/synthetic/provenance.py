@@ -1,6 +1,9 @@
 import random
 
 
+_MAX_JOBS_PER_ROLE = 5
+
+
 class ProvenanceGenerator:
     """Generates trigger_ref patterns for synthetic GCP audit log events.
 
@@ -11,11 +14,15 @@ class ProvenanceGenerator:
     def __init__(self, seed: int = 42):
         self.rng = random.Random(seed)  # noqa: S311  # nosec B311
         self.trigger_counter = 0
+        self._job_pool: dict[str, list[str]] = {}
 
     def benign_trigger_ref(self, actor_email: str) -> str:
         """Generate a valid Cloud Scheduler trigger_ref.
 
-        Represents a real, verifiable scheduled job invocation.
+        Models recurring Cloud Scheduler jobs: each role has a small pool
+        of job resource paths that are reused across invocations, matching
+        real GCP behavior where the same job fires repeatedly with the
+        same resource path.
 
         Args:
             actor_email: Actor email (used to derive role for naming)
@@ -25,9 +32,18 @@ class ProvenanceGenerator:
         """
         parts = actor_email.split("-")
         role = parts[0] if parts else "unknown"
+        pool = self._job_pool.setdefault(role, [])
+
+        # Reuse existing job if pool is non-empty
+        if pool and (len(pool) >= _MAX_JOBS_PER_ROLE or self.rng.random() < 0.7):
+            return self.rng.choice(pool)
+
+        # Create new recurring job
         job_id = f"trigger-{role}-{self.trigger_counter}"
         self.trigger_counter += 1
-        return f"projects/synth-project/locations/us-central1/jobs/{job_id}"
+        ref = f"projects/synth-project/locations/us-central1/jobs/{job_id}"
+        pool.append(ref)
+        return ref
 
     def no_trigger_ref(self) -> None:
         """Return None for events with no provenance.
