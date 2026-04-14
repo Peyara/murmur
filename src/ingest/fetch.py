@@ -26,6 +26,7 @@ from src.ingest.parser import parse_audit_log
 from src.ingest.provenance_ingest import enrich_provenance
 from src.ingest.scheduler_parser import SchedulerExecution
 from src.schema import CanonicalEvent
+from src.score.closure import create_watch, seed_pairs, try_close_watch
 
 logger = logging.getLogger(__name__)
 
@@ -146,9 +147,7 @@ def get_checkpoint(db: duckdb.DuckDBPyConnection, source_id: str) -> str | None:
     return row[0] if row else None
 
 
-def set_checkpoint(
-    db: duckdb.DuckDBPyConnection, source_id: str, blob_name: str
-) -> None:
+def set_checkpoint(db: duckdb.DuckDBPyConnection, source_id: str, blob_name: str) -> None:
     """Upsert the checkpoint for a source."""
     db.execute(
         """
@@ -177,6 +176,7 @@ def fetch_and_ingest(
     Resumes from last checkpoint. Updates checkpoint after each blob.
     """
     known_initiators = SETTINGS.load_known_initiators()
+    seed_pairs(db)  # Idempotent — seeds opening_closing_pairs on first run
     checkpoint = get_checkpoint(db, source_id)
 
     all_blobs = source.list_blobs()
@@ -190,9 +190,7 @@ def fetch_and_ingest(
     for blob_name in all_blobs:
         logger.info("Processing blob: %s", blob_name)
         content = source.read_blob(blob_name)
-        blob_inserted, blob_skipped, blob_errors = _ingest_content(
-            db, content, known_initiators, blob_name
-        )
+        blob_inserted, blob_skipped, blob_errors = _ingest_content(db, content, known_initiators, blob_name)
         stats["inserted"] += blob_inserted
         stats["skipped"] += blob_skipped
         stats["parse_errors"] += blob_errors
@@ -226,6 +224,9 @@ def _ingest_content(
             event = enrich_provenance(event, known_initiators)
             if insert_event(db, event):
                 inserted += 1
+                # Closure pipeline: open/close watches per event
+                create_watch(db, event)
+                try_close_watch(db, event)
             else:
                 skipped += 1
         except (json.JSONDecodeError, KeyError, ValueError) as e:
@@ -308,6 +309,7 @@ def fetch_and_ingest_multi(
         )
 
     known_initiators = SETTINGS.load_known_initiators()
+    seed_pairs(db)  # Idempotent — seeds opening_closing_pairs on first run
 
     # Collect parsed entries by type across all prefixes
     all_scheduler: list[SchedulerExecution] = []
@@ -382,6 +384,9 @@ def fetch_and_ingest_multi(
         event = enrich_provenance(event, known_initiators)
         if insert_event(db, event):
             stats["inserted"] += 1
+            # Closure pipeline: open/close watches per event
+            create_watch(db, event)
+            try_close_watch(db, event)
         else:
             stats["skipped"] += 1
 
