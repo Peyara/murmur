@@ -6,6 +6,69 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-14 — R&D + Autonomous — Session O: Synthetic hardening + MVP thesis validated
+
+**Session Summary**
+- Mode: Autonomous (Thread 1: synthetic generator hardening) then R&D (Thread 2: pipeline validation)
+- Thread 1: Hardened synthetic generator via 2 sequential autonomous agents + orchestrator integration (PRs #27-29 merged)
+  - ActionType coverage 12→17, evidence-grounded temporal profiles, attack provenance patterns, composer integration
+  - Research pass: M-Trends 2026, Paxson 1995, GCP IAM propagation, RANK paper, competitor landscape
+- Thread 2: Full-pipeline validation on 1,161 synthetic events (PR #30 merged)
+  - **Critical finding: closure pipeline was dead code** — fully implemented, never called from CLI
+  - Wired seed_pairs, create_watch, try_close_watch into ingest; mine_candidate_pairs into score
+  - Added Cloud Scheduler resource path resolution to trigger chain (corroboration-based)
+  - **MVP thesis validated:** 70% attacker/worker residual gap with both physics + provenance contributing
+
+**Key Finding: Closure Was Dead Code**
+The closure pipeline (seed_pairs, create_watch, try_close_watch, mine_candidate_pairs) was fully implemented in closure.py but never called from any CLI command. Unit tests passed, but the feature was non-functional end-to-end. After wiring: orphaned_privilege went from 0% to 10.8% activation, closure_ratio from saturated 1.0 to real variance. The Session N ablation conclusion ("closure needs diverse data, 1.8% activity") was an artifact of the pipeline not being wired, not a data diversity problem.
+
+**Key Finding: Trigger Chain Resolution Discriminates**
+Added Cloud Scheduler resource path resolution with corroboration (trigger_ref resolves if well-formed + appears on ≥2 events). Workers resolve 20%, attackers 4%. Provenance discount now selectively favors benign actors.
+
+**Key Finding: Research Grounding Prevents Assumption Bias**
+User challenged "where are you getting realistic pattern inputs?" before temporal profile design. Research found: M-Trends 22s handoff (burst anchor), GCP IAM 2-min propagation (stealth anchor), Paxson 1995 (Poisson invalid for cloud). Without this challenge, profiles would have been parameterized from assumptions.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| 2 sequential agents (not 3 parallel) | 3 parallel | Session N drift lesson |
+| Research before parameterization | Invent temporal numbers | Observe-before-hypothesize principle |
+| burst_cluster spread=30, stealth min_gap=120 | Round numbers | M-Trends + IAM propagation empirical anchors |
+| Corroboration-based trigger resolution | Known-initiator-only | Works with synthetic data, scales to any format |
+| Wire closure into ingest (per-event) | Batch during score | Watches need temporal order; ingest is natural place |
+| Defer AGENT_TOOL_CALL | Include now | Needs parser changes — different scope |
+
+**Exceptions**
+- "One feature per session" — R&D observation loops span multiple concerns naturally
+- "Tests before code" — Pipeline wiring validated via observation runs, not TDD
+- "Plan first" — Thread 2 evolved from observation; the observations were the plan
+
+**Open Questions**
+1. Closure re-ablation needed — prior result invalidated (10.8% vs 1.8% activity)
+2. Deployer/admin/scheduler trigger resolution = 0% — unique job IDs fail corroboration
+3. Directionality gap confirmed — pair miner found reverse patterns (DELETE→CREATE)
+4. RANK tactic transition weights — architectural signal for Thread 3
+5. Large-scale validation (1,000+ trajectories) deferred — all signals now active
+
+**Evolution Candidates**
+- Dead code detection in pipelines — **promote** (verify CLI wiring, not just unit tests)
+- Research grounding before parameterization — **promote** (specific application of observe-before-hypothesize)
+- R&D observation loops — **watch** (already covered by R&D mode relaxation)
+
+---
+
+### 2026-04-13 — Autonomous — Session N: Synthetic generator + closure ablation (reconstructed)
+
+*Note: Original LEARNINGS.md entry lost during branch operations. Reconstructed from CURRENT_STATE.md.*
+
+- First autonomous mode test. Agent A delivered synthetic generator (PR #25). Agent B failed (fabricated output).
+- Rebuilt ablation manually. Finding: closure signals active in 1.8% of pairs — later found to be an artifact of pipeline not being wired (see Session O).
+- PRs #25-26 merged. Repo-wide lint/bandit debt cleared.
+- Key lesson: autonomous agent output must be mechanically verified.
+
+---
+
 ### 2026-04-12 — Production — Session M: Autonomous mode failsafes + hook-enforced safety
 
 **Session Summary**
