@@ -6,6 +6,44 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-14 — Production — Session P: Closure re-ablation + trigger resolution fix
+
+**Session Summary**
+- Mode: Production. Two tightly coupled features delivered in one session (user-directed).
+- Feature 1: Role-based closure ablation — extended ablation infrastructure, validated closure signals contribute 35.7% of attacker/worker gap.
+- Feature 2: Trigger_ref pooling fix — admin/deployer/scheduler resolution 0% → 63-80%, residual gap preserved at 70.3%.
+- PR #31 opened. 514 tests pass (17 new).
+
+**Key Finding: Closure Signals Punch Above Their Weight**
+Closure signals (closure_gap=0.10, orphaned_priv=0.05, total 15% weight) contribute 35.7% of the attacker/worker fusion gap. Ablation drops the gap from 65.9% to 42.3%. Activation asymmetry: attackers 58.6% vs workers 12.6% (4.6x). Prior Session N conclusion ("closure needs diverse data, 1.8% activity") was doubly wrong — first the pipeline was unwired (Session O), now confirmed the signal is high-value.
+
+**Key Finding: 0% Resolution Was Synthetic Data Artifact**
+Admin/deployer/scheduler had 0% trigger resolution because `benign_trigger_ref()` created unique trigger_refs per invocation. Real Cloud Scheduler jobs reuse the same resource path across firings. Fix: per-role job pool (max 5 jobs, 70% reuse). The corroboration logic in trigger_chain.py was correct all along.
+
+**Key Finding: Attacker Resolution Rate Is Realistic**
+After fix, attacker resolution = 60.6% (up from 4%). This is realistic — compromised SAs still run legitimate scheduled jobs. The provenance differential comes from RATE of resolution (workers 80% vs attackers 61%), not binary resolved/unresolved.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Analyze fusion_raw for ablation | residual_risk | Isolates closure from provenance effects |
+| Gap = attacker_mean / worker_mean | Absolute diff, AUC | Dimensionless, intuitive, scale-independent |
+| Fix synthetic generator, not trigger_chain.py | Identity-based resolution path | Root cause was unrealistic data, not broken logic |
+| Per-role pool max 5, 70% reuse | Unlimited; fixed 3; 50% reuse | Matches realistic GCP project (5-20 scheduled jobs) |
+| Accept 60.6% attacker resolution | Suppress attacker resolution | Realistic — compromised SAs still run legit jobs |
+
+**Exceptions**
+- "One feature per session" — two features, tightly coupled, user-directed. One-off.
+- "Plan first" for trigger fix — skipped, proportional to scope (20 LOC). One-off.
+
+**Open Questions**
+1. Worker closure noise — WATCH-tier false alerts on workers with open watches. TTL-weighted closure_gap could help.
+2. Per-window vs per-event trigger resolution — blunt instrument, compromised SAs get window resolved from noise events.
+3. Large-scale validation (Thread 3) and directionality gap (Thread 4) remain.
+
+---
+
 ### 2026-04-14 — R&D + Autonomous — Session O: Synthetic hardening + MVP thesis validated
 
 **Session Summary**

@@ -389,6 +389,71 @@ def generate(actors: int, windows: int, attack_ratio: float, seed: int, output: 
         sys.exit(1)
 
 
+@cli.command("validate")
+@click.option("--seeds", type=int, default=100, help="Number of seeds to sweep (1..N).")
+@click.option("--actors", "actor_counts", default="10,20,30", help="Comma-separated actor counts.")
+@click.option("--ratios", default="0.1,0.2,0.3", help="Comma-separated attack ratios.")
+@click.option("--windows", type=int, default=20, help="Windows per trajectory.")
+@click.option("--output", default="docs/rd_reports/large_scale_validation.md", help="Output report path.")
+@click.option("--parallel", type=int, default=1, help="Parallel workers (1 = sequential).")
+def validate(seeds: int, actor_counts: str, ratios: str, windows: int, output: str, parallel: int):
+    """Run large-scale validation sweep across parameter grid."""
+    from src.validation.large_scale import RunMetrics, SweepConfig, aggregate_report, run_single_trajectory
+
+    actor_list = [int(a.strip()) for a in actor_counts.split(",")]
+    ratio_list = [float(r.strip()) for r in ratios.split(",")]
+    cfg = SweepConfig(seeds=range(1, seeds + 1), actor_counts=actor_list, attack_ratios=ratio_list, windows=windows)
+    grid = cfg.param_grid()
+    total = len(grid)
+    click.echo(
+        f"Validation sweep: {total} trajectories "
+        f"({seeds} seeds × {len(actor_list)} actor counts × {len(ratio_list)} ratios)"
+    )
+
+    results: list[RunMetrics] = []
+    failed = 0
+
+    if parallel > 1:
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        with ProcessPoolExecutor(max_workers=parallel) as pool:
+            futures = {pool.submit(run_single_trajectory, **p): i for i, p in enumerate(grid)}
+            for future in as_completed(futures):
+                idx = futures[future]
+                try:
+                    results.append(future.result())
+                except Exception as e:
+                    failed += 1
+                    click.echo(f"  Run {idx} failed: {e}", err=True)
+                done = len(results) + failed
+                if done % 50 == 0 or done == total:
+                    click.echo(f"  Progress: {done}/{total}")
+    else:
+        for i, params in enumerate(grid):
+            try:
+                results.append(run_single_trajectory(**params))
+            except Exception as e:
+                failed += 1
+                click.echo(f"  Run {i} failed: {e}", err=True)
+            done = len(results) + failed
+            if done % 50 == 0 or done == total:
+                click.echo(f"  Progress: {done}/{total}")
+
+    if not results:
+        click.echo("No successful runs.", err=True)
+        sys.exit(1)
+
+    report = aggregate_report(results)
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report.to_markdown())
+    click.echo(f"\nResults: {len(results)} succeeded, {failed} failed")
+    click.echo(f"Mean gap: {report.mean_gap:.1f}% (std: {report.std_gap:.1f}%)")
+    click.echo(f"Worst gap: {report.worst_gap:.1f}%, Best gap: {report.best_gap:.1f}%")
+    click.echo(f"Mean FP: {report.mean_fp:.3f}, Mean FN: {report.mean_fn:.3f}")
+    click.echo(f"Report written to {output_path}")
+
+
 @cli.command("ablate")
 @click.option("--db-path", default=None, help="Path to DuckDB file.")
 @click.option("--output", default="docs/rd_reports/closure_ablation.md", help="Output report path.")

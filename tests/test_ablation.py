@@ -4,7 +4,6 @@ import math
 
 from src.score.ablation import (
     AblationResult,
-    RoleBasedStats,
     ScoredRow,
     assign_tier,
     compute_fusion_with_weights,
