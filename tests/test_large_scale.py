@@ -2,14 +2,12 @@
 
 import math
 
-import pytest
-
 from src.validation.large_scale import (
     RunMetrics,
     SweepConfig,
     ValidationReport,
-    run_single_trajectory,
     aggregate_report,
+    run_single_trajectory,
 )
 
 

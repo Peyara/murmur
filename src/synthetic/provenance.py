@@ -1,6 +1,5 @@
 import random
 
-
 _MAX_JOBS_PER_ROLE = 5
 
 

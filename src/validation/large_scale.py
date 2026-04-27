@@ -94,7 +94,7 @@ class ValidationReport:
         lines = []
         lines.append("# Large-Scale Validation Report")
         lines.append(f"\nGenerated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        lines.append(f"\n## Summary\n")
+        lines.append("\n## Summary\n")
         lines.append(f"- **Total runs:** {self.total_runs}")
         lines.append(f"- **Total events processed:** {self.total_events:,}")
         lines.append(f"- **Mean gap:** {self.mean_gap:.1f}% (std: {self.std_gap:.1f}%)")
@@ -104,7 +104,7 @@ class ValidationReport:
         lines.append(f"- **Mean FP rate:** {self.mean_fp:.3f}")
         lines.append(f"- **Mean FN rate:** {self.mean_fn:.3f}")
 
-        lines.append(f"\n## Parameter Sensitivity\n")
+        lines.append("\n## Parameter Sensitivity\n")
         lines.append("### By Actor Count\n")
         lines.append("| Actors | Mean Gap (%) |")
         lines.append("|--------|-------------|")
@@ -117,7 +117,7 @@ class ValidationReport:
         for k in sorted(self.gap_by_attack_ratio):
             lines.append(f"| {k} | {self.gap_by_attack_ratio[k]:.1f} |")
 
-        lines.append(f"\n## Signal Reliability\n")
+        lines.append("\n## Signal Reliability\n")
         lines.append("Fraction of runs where each signal fires (activation > 0).\n")
         lines.append("| Signal | Reliability | Mean Activation |")
         lines.append("|--------|------------|-----------------|")

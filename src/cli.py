@@ -405,7 +405,10 @@ def validate(seeds: int, actor_counts: str, ratios: str, windows: int, output: s
     cfg = SweepConfig(seeds=range(1, seeds + 1), actor_counts=actor_list, attack_ratios=ratio_list, windows=windows)
     grid = cfg.param_grid()
     total = len(grid)
-    click.echo(f"Validation sweep: {total} trajectories ({seeds} seeds × {len(actor_list)} actor counts × {len(ratio_list)} ratios)")
+    click.echo(
+        f"Validation sweep: {total} trajectories "
+        f"({seeds} seeds × {len(actor_list)} actor counts × {len(ratio_list)} ratios)"
+    )
 
     results: list[RunMetrics] = []
     failed = 0
