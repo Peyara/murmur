@@ -103,6 +103,70 @@ The parameterized attack generator systematically covers the strategy space with
 
 ---
 
+## Execution Plan (added 2026-04-27, Session Q)
+
+### Pivot Context
+
+`docs/mvp_strategy_phase_b.md` declares Phase B (learned representations) **conditional on Sprint 2's hypothesis passing** — physics signals achieving ≥80% detection across the parameterized attack grid. The Sprint 2 *spec* exists; the *grid was never built*. PR #34 (`large_scale.py`) sweeps `seeds × actor_counts × attack_ratios × windows` — different axes; characterizes the residual_risk *distribution* but does not vary attack *strategy*. So the Phase B pivot condition is currently unverified.
+
+**Decision:** Build Sprint 2's grid first (3-4 days). Only commit to Phase B B1 (TGN+TPP, 4-6 weeks) after the gate is evaluated on real attack-strategy axes. Sprint 3 (provenance + closure) is deferred.
+
+This plan is the resume point. Pick up at the first unchecked Phase below.
+
+### Phase 1 — Attack Generator (`src/validation/attack_generator.py`)
+
+- [ ] Define `AttackParams` dataclass with axes from the spec table: `speed`, `spread`, `zone_path`, `evasion`, `closure`, `objective`
+- [ ] Implement `generate_trajectory(params: AttackParams, seed: int) -> list[CanonicalEvent]` that produces deterministic, valid CanonicalEvent sequences
+  - Zone mappings correct per `src/world/zones.py`
+  - Action types valid per `src/ingest/canonical.py`
+  - Timestamps strictly ordered, intervals matching `speed`
+  - `trigger_ref` set directly on synthetic events (per spec line 85 — bypass correlation pipeline)
+  - Each trajectory carries metadata: param settings, expected zone path, expected signals
+- [ ] `tests/test_attack_generator.py`: validity checks (zones, timestamps, action types), determinism (same params + seed → same trajectory), edge-case coverage
+
+### Phase 2 — Robustness Harness (`src/validation/robustness.py`)
+
+- [ ] `param_grid()` enumerator: 3 speeds × 2 spreads × 3 zone_paths × 4 evasions = 72 base combinations; sample 30-50 per spec
+- [ ] 5 hand-crafted edge cases per spec (slow ratchet, multi-actor convergence, EXFIL-avoiding path, perfect mimicry, single-event)
+- [ ] Per-trajectory scoring: inject into DuckDB → run full pipeline → record `fusion_raw`, `residual_risk`, signal activations, signal magnitudes, detection bool at current threshold (4.5/3.4/2.0 from PR #34)
+- [ ] `RobustnessReport`: detection rate by each param axis (speed / spread / zone_path / evasion / closure), most-robust signals, most-fragile signals, blind-spot combinations, failure-mode notes
+- [ ] CLI exposure: `murmur robustness --grid-size N --output docs/rd_reports/<date>_robustness.md`
+
+### Phase 3 — Run + Report
+
+- [ ] Run grid (~50 trajectories) + 5 edge cases against current pipeline
+- [ ] Generate report at `docs/rd_reports/2026-MM-DD_sprint2_robustness.md`
+- [ ] Cross-reference against `docs/rd_reports/2026-04-17_large_scale_validation_recalibrated.md` — does the strategy-grid failure mode match the per-window FN rate seen there?
+
+### Phase 4 — Gate Decision (write decision into Findings Log + CURRENT_STATE)
+
+| Outcome | Detection Rate | Next Move |
+|---|---|---|
+| **PASS** | ≥80% across grid, no class with 0% | Phase B B1 is justified — start TGN+TPP scaffolding |
+| **BORDERLINE** | 60-80% | Document failure modes; some may need Sprint 3 closure (deferred) rather than learned layer; partial Phase B may still be the right move if failures cluster on regimes where representations help |
+| **FAIL** | <60% | Physics thesis weaker than claimed. Re-evaluate before either Sprint 3 or Phase B. Consider Phase 2 signals (`target_convergence`, `eddy_score`) per spec line 101 |
+| **CLASS-WIPE** | Any single param class at 0% | That class is a blind spot regardless of overall rate — document and decide whether to fill (Sprint 3 / Phase B / new signal) |
+
+### Branch + PR Plan
+
+- Branch: `feature/sprint2-attack-grid` off latest `main` (post-PR #34)
+- Commit shape: (1) attack_generator + tests, (2) robustness harness + CLI, (3) grid run output + R&D report
+- Single PR — easier to review the gate evidence as a unit
+- After PR merges: write Sprint 2 Findings Log, update CURRENT_STATE.md with gate verdict and resume point (Phase B B1 / Sprint 3 / redesign)
+
+### Estimated Time
+
+3-4 days, tracked against this plan. If Phase 1 alone exceeds 2 days, stop and check assumptions — generator simplicity is a forcing function.
+
+### What's Deferred Until After This Gate
+
+- Sprint 3 (provenance + closure) — explicitly deferred per user direction 2026-04-27
+- Phase B B1 (TGN encoder + TPP intensity head) — conditional on this gate
+- Actor-level alerting investigation — orthogonal finding from PR #34, queue for after gate
+- Directionality gap (causal filter for pair miner) — Sprint 3 work, deferred with it
+
+---
+
 ## Findings Log
 
 _Updated as analysis runs:_
