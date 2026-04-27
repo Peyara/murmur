@@ -6,6 +6,50 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-27 — Production — Session P-prep: Standards installed; Phase B docs merged; queue planned
+
+**Session Summary**
+- Mode: Production
+- Installed peyara-standards locally (symlinks to global CLAUDE.md, peyara/CLAUDE.md, 9 commands, settings-base.json merged into ~/.claude/settings.json with backup). Hook safety rails now active.
+- Read mvp_strategy_phase_b.md and supporting context. Built forward queue: P (Sprint 2 formal gate) → Q (targeted Phase 1.2 signals) → R (directionality + closure independence) → S (large-scale validation) → T (B1 kickoff).
+- Opened + merged PR #32: rename `mvp_strategy.md` → `mvp_strategy_phase_a.md`, add `mvp_strategy_phase_b.md` + `docs/theory/{physics_foundations,schnakenberg_formalization}.md`. 4 files, +868 lines, docs-only.
+
+**Key Finding: Phase B Pivot Condition Informally Met, Formally Unverified**
+Phase B is conditional on Sprint 2's >80% detection rate across the parameterized attack grid. Session O measured a 70% attacker/worker *residual gap* on a single seed=42 synthetic run — different metric, different artifact, not a substitute for the formal grid measurement. `src/validation/attack_generator.py` doesn't exist; the Sprint 2 deliverable (30-50 trajectory grid + robustness report) was never produced. Session P should close this gate before any 4-6 wk B1 investment.
+
+**Key Finding: Closure Shows No Independent Fusion-Level Signal at Current Scale**
+The 2026-04-14 closure re-ablation showed zero vs redistribute deltas identical (1.00x ratio) — closure_gap and orphaned_priv don't add independent signal at the fusion stage, even though attackers show 58.6% closure_gap activation vs workers' 12.6%. The signal exists but is washed out by other weights. Three possible causes (weight calibration / signal redundancy / threshold mismatch) — needs dedicated investigation in Session R before B3 builds on it.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Run install.sh before any work | Proceed without verifying standards | User explicitly asked; safety hooks only active after install |
+| Recommend Sprint 2 formal gate before B1 | Start B1 on Session O's 70% gap | Phase B doc explicitly conditions on formal grid; 4-6 wk investment without gate too risky |
+| Rename to `phase_a` not `phase_1` | Keep `phase_1` | User correction; a/b symmetry cleaner |
+| Mini-PR via feat branch + GitHub UI merge | Direct merge inline | Agent merge hook blocks `gh pr merge`; matches PR-per-feature discipline |
+
+**Exceptions**
+- No exceptions. ELI10 protocol correctly skipped (docs-only, no detection logic changed).
+
+**Open Questions**
+1. Sprint 2 formal gate measurement — Session P
+2. Option to skip formal gate and go directly to B1
+3. Closure independence puzzle — weight cal vs redundancy vs threshold (Session R)
+4. Directionality gap — RANK-style transition weights vs simpler causal filter (Session R)
+5. Sprint 4 dashboard parallelism with the P-S queue
+6. Carry-over: install.sh idempotency bug (peyara-standards repo)
+7. Git committer identity — auto-derived `mbp.mynetworksettings.com`, should be `pango.co`
+
+**Evolution Candidates**
+- Distinguishing informal observation runs from formal gate measurements — **watch** (recurring risk for future sprint gates)
+- Pre-flight standards verification at session start — **watch** (one occurrence; install.sh is re-runnable)
+- Mini-PR pattern for doc-only changes — **watch** (could become `/doc-pr` skill if it recurs)
+
+**Standards Audit:** No standards candidates this session.
+
+---
+
 ### 2026-04-14 — R&D + Autonomous — Session O: Synthetic hardening + MVP thesis validated
 
 **Session Summary**
