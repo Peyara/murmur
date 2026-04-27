@@ -6,6 +6,49 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-27 — Production — Session Q: Divergence recovery + validation merge + Sprint 2 pivot plan
+
+**Session Summary**
+- Mode: Production. Three deliverables: (1) reconcile main divergence without losing Session P writeup, (2) ship the long-uncommitted large-scale validation work, (3) reframe next-step plan around Phase B pivot condition.
+- Pulled origin at session start (per new feedback memory) → caught local 1 ahead, origin/main 5 ahead, plus ~3 sessions of dirty work uncommitted (large-scale validation harness from Apr 14/17).
+- Cherry-picked Session P LEARNINGS writeup (38 lines) onto reset main; bundled into PR #34 with validation harness + threshold recalibration. CI green after lint fixes. Merged.
+- Identified Sprint 2 pivot gap: Phase B (learned representations, 17 weeks total) is conditional on Sprint 2's attack-strategy grid producing >80% detection. Grid was never built. PR #34's `large_scale.py` sweeps different axes (traffic shape, not attack strategy).
+- Decision: defer Sprint 3 (provenance/closure), build Sprint 2 attack generator + grid first as the Phase B gate. Plan written into `docs/sprints/sprint_02_attack_robustness.md` "Execution Plan (Session Q)".
+
+**Key Finding: Session-Start Pull Catches Multi-Session Drift**
+Three sessions of work (Apr 14, Apr 17 R&D reports + harness + recalibration) were sitting uncommitted from prior machines/sessions. A divergence + dirty tree at session start is a signal the project has been worked on elsewhere — the failure mode is silent because no one error-rays it. Promoted "always pull at start" to a feedback memory and recommended SessionStart hook elevation.
+
+**Key Finding: Phase B Pivot Condition Was Almost Skipped**
+Phase B doc explicitly gates on Sprint 2's hypothesis passing, but Sprint 2's parameterized attack grid was never built. The just-merged `large_scale.py` characterizes the residual_risk *distribution* across traffic shapes, which is useful, but does not vary attack *strategy* (speed × spread × zone_path × evasion × closure × objective). Without the strategy grid, Phase B B1 (4-6 weeks of TGN+TPP work) would commit to a representation-learning track without confirming the physics layer is robust enough to be augmented vs. replaced.
+
+**Key Finding: Threshold Recalibration Reveals Actor-Level Lever**
+PR #34's recalibrated thresholds (4.5/3.4/2.0) brought per-window FN from 91% to ~68%. The same data shows actor-level mean gap is 52% — much stronger discrimination than per-window. Per-window thresholds may be the wrong unit; alerting on actor-mean residual_risk is a candidate post-Sprint-2-gate investigation.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Cherry-pick local Session P LEARNINGS onto reset main | Hard reset; merge | Hard reset would lose 38-line writeup; merge would tangle session-end-file conflicts |
+| Plain "Session P" naming on restored entry | "Session P-pre", "Session O.5" | No collision on origin/main; "P-prep" framing on side branch is drift not convention |
+| gitignore `data/synth_validation.jsonl` | Commit as fixture | Regenerable; not referenced by code; 1161 lines is bloat |
+| Single PR bundling validation + recalibration + LEARNINGS restore | Two PRs (work vs handoff) | User chose speed; recalibration is causally tied to harness findings |
+| Defer Sprint 3 (provenance/closure) | Continue directionality gap | User direction; Phase B pivot matters more than Sprint 3 polish |
+| Build Sprint 2 grid before Phase B B1 | Skip gate, start TGN scaffolding | 3-4 days vs 4-6 weeks; grid failures become the spec for what learning should add |
+
+**Exceptions**
+- "Plan first" for non-trivial implementation — bundled PR #34 by user direction ("go with all 3 as you see fit", "asap"). One-off.
+- "One feature per session" — PR #34 = harness + recalibration + LEARNINGS restore. One-off, justified by causal tie.
+- Living Plan Discipline (Sprint 3 Findings Log) — empty despite Sessions K/O/P touching Sprint 3. Deferred this session by user direction; flag for Sprint 3 reactivation.
+
+**Open Questions**
+1. `session/2026-04-27-end` branch with `09d4852` "Session P-prep close" — never landed on main; safe to delete?
+2. Sprint 3 Findings Log retroactive logging when sprint reactivates.
+3. Actor-level alerting investigation queued behind Sprint 2 gate.
+4. Recalibrated thresholds (4.5/3.4/2.0) tuned on `large_scale.py` axes; may need re-tune on Sprint 2 attack-strategy grid distribution.
+5. Naming-convention drift ("P-prep close") — watch, treat as one-off unless it recurs.
+
+---
+
 ### 2026-04-14 — Production — Session P: Closure re-ablation + trigger resolution fix
 
 **Session Summary**
