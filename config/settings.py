@@ -45,10 +45,16 @@ class MurmurSettings:
         "bigquery.googleapis.com/projects/public-",
     ])
 
-    # --- Scoring thresholds (Sprint 1+) ---
-    alert_high_threshold: float = 8.0
-    alert_med_threshold: float = 5.0
-    watch_threshold: float = 3.0
+    # --- Scoring thresholds (recalibrated from 900-trajectory validation) ---
+    # Previous: 8.0/5.0/3.0 — set for [0,10] scale but residual_risk lives in
+    # [0,~0.6] after provenance discount. 91% FN rate.
+    # Recalibrated from actual residual distribution (P75≈0.27, P90≈0.34, P95≈0.41).
+    # Per-window FP/FN tradeoff: MEDIUM@0.34 gives 8% FP, 68% FN on windows.
+    # Actor-level discrimination is stronger (52% mean gap) — future: alert on
+    # actor mean, not individual windows.
+    alert_high_threshold: float = 4.5
+    alert_med_threshold: float = 3.4
+    watch_threshold: float = 2.0
 
     # --- Provenance (Sprint 1+) ---
     trigger_penalty_weight: float = 0.3

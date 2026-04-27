@@ -34,5 +34,8 @@ data/real/
 # Attack injection results (may contain project IDs, never commit)
 data/attack_results/
 
+# Generated synthetic validation datasets (regenerable from harness)
+data/synth_validation.jsonl
+
 # DB backups
 *.duckdb.pre-attack-backup
