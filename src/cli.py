@@ -454,6 +454,58 @@ def validate(seeds: int, actor_counts: str, ratios: str, windows: int, output: s
     click.echo(f"Report written to {output_path}")
 
 
+@cli.command("robustness")
+@click.option("--grid-size", type=int, default=50, help="Number of grid trajectories to sample (30-50 per spec).")
+@click.option("--seed", type=int, default=0, help="Master seed for grid sampling and per-trajectory generation.")
+@click.option("--parallel", type=int, default=1, help="Parallel workers (1 = sequential).")
+@click.option(
+    "--output",
+    default="docs/rd_reports/sprint2_robustness.md",
+    type=click.Path(),
+    help="Output report path.",
+)
+@click.option("--include-edge-cases/--no-edge-cases", default=True, help="Include 5 hand-crafted edge cases.")
+def robustness(grid_size: int, seed: int, parallel: int, output: str, include_edge_cases: bool):
+    """Run Sprint 2 attack-strategy robustness grid (parameterized attack generator)."""
+    from src.validation.robustness import (
+        aggregate,
+        edge_cases,
+        param_grid,
+        run_grid,
+        run_trajectory,
+    )
+
+    grid_params = param_grid(grid_size=grid_size, seed=seed)
+    click.echo(
+        f"Running robustness grid: {len(grid_params)} trajectories, parallel={parallel}"
+    )
+    grid_results = run_grid(grid_params, parallel=parallel)
+    click.echo(f"  grid: {len(grid_results)} succeeded")
+
+    edge_results = []
+    if include_edge_cases:
+        edges = edge_cases()
+        click.echo(f"Running {len(edges)} edge cases sequentially")
+        for params, eseed, label in edges:
+            try:
+                edge_results.append(run_trajectory(params, eseed, label))
+            except Exception as e:  # pragma: no cover
+                click.echo(f"  edge case {label} failed: {e}", err=True)
+
+    if not grid_results:
+        click.echo("No successful grid runs.", err=True)
+        sys.exit(1)
+
+    report = aggregate(grid_results, edge_results)
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report.to_markdown())
+
+    click.echo(f"\nDetection rate (overall): {report.detection_rate_overall*100:.1f}%")
+    click.echo(f"Blind spots: {len(report.blind_spots)} of {len(grid_results)}")
+    click.echo(f"Report written to {output_path}")
+
+
 @cli.command("ablate")
 @click.option("--db-path", default=None, help="Path to DuckDB file.")
 @click.option("--output", default="docs/rd_reports/closure_ablation.md", help="Output report path.")
