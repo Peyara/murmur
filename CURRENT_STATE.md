@@ -4,59 +4,51 @@
 
 ## Active Sprint
 
-**Sprint 2 methodological cleanup complete (Session S, 2026-04-30, autonomous).** Sprint 3 (provenance/closure full integration) is **partially blocked** pending a "Sprint 2.5" signal architecture review. PR `auto/sprint2-baseline-recalibration` open for review.
+**Sprint 2.5 — Physics Signal Architecture Review.** Spec merged (PR #38, commit `78e7ac6`); execution not yet started. 2-3 day R&D pass with falsifier locked at ≥1.5x discrimination ratio before Day 1.
 
 ## Last Completed Milestone
 
-Session S: embedded attack trajectories in benign baseline + recalibrated thresholds against benign-only FP floor. Predict-then-observe rigor maintained — predictions committed before run.
-
-**Headline verdict:** FAIL at safe FP thresholds (30% recalibrated detection, vs 92% misleading at original WATCH=0.20). Sprint 2's methodological-vs-architectural ambiguity is **resolved** with three findings:
-
-1. Methodology was bad for closure_gap, novelty, bridge (now fire under baseline).
-2. Physics signals (sigma_coarse, delta_f) are architecturally dead — 0% on attack across two harness configurations.
-3. Separate finding: attack-vs-benign signal-vs-noise gap is too small. Attack P75=0.428, benign P95=0.375. Gap of 0.05 is not load-bearing.
-
-Files: `src/validation/baseline_robustness.py` (~430 LOC), `tests/test_baseline_robustness.py` (9 tests), `src/cli.py` +`robustness-baseline` subcommand. 575 tests pass.
-
-Reports:
-- `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration.md` — predictions + observations + verdict
-- `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration_run.md` — machine-generated grid output
+Session S (2026-04-30, autonomous + R&D discussion): Sprint 2 methodological cleanup merged via PR #37 (commit `f21fd13`). Sprint 2.5 spec designed and merged via PR #38 (commit `78e7ac6`). Both PRs merged by user.
 
 ## Open Blockers / Questions
 
-1. **PR review needed.** `auto/sprint2-baseline-recalibration` open. Per autonomous mode failsafe, the agent did NOT merge. Review + decide on the recommendation tree branch.
-2. **Recommendation tree branch: FAIL.** "Reframe; redesign needed before any new layer." Concrete moves: drop/replace sigma_coarse and delta_f, address signal-vs-noise gap, then revisit Sprint 3 / Phase B B1.
-3. **Synthetic benign baseline may be over-noisy.** P95=0.375 is high. Open question: is real GCP sandbox traffic quieter? Testable on the existing GCP sandbox.
-4. **bridge_new is barely discriminative** (81% benign / 100% attack). Worth ablating.
-5. **closure_gap is the standout discriminator** (3.3x). Sprint 3's closure work is justified independently.
-6. **Orphan branch `session/2026-04-27-Q-end`** (`09d4852`) still pending from Session Q. Not addressed this session.
+1. **Sprint 2.5 execution.** Branch `rd/sprint2-5-physics-review` off main. Day 1 = three diagnostic probes (bug/calibration/concept) on `sigma_coarse` and `delta_f`. **User-review checkpoint required between Day 1 and Day 2.**
+2. **Predictions for Sprint 2.5 must be committed BEFORE Day 1.** Spec already lists prior probabilities (35/30/25/10 for bug/calibration/concept/refuted); these need to land in the new R&D report at sprint kickoff.
+3. **Synthetic baseline noise.** Benign-only P95=0.375 in PR #37 may be a synthetic artifact. Testable on existing GCP sandbox. Deferred until Sprint 2.5 verdict to avoid mixing variables.
+4. **Sprint 2.6 (proposed).** Same protocol applied to `novelty` and `bridge_new` (both 1.2x discrimination). Deferred until 2.5 protocol is validated.
+5. **Sprint 3 (provenance/closure full integration).** Partially blocked. closure_gap (3.3x) is independently validated; closure work is justified.
+6. **Phase B B1 (TGN/TPP).** Fully blocked pending Sprint 2.5 + 2.6.
+7. **Worktree cleanup.** `/Users/shamreeniram/Desktop/Peyara/Murmur-baseline-recalib` worktree purpose fulfilled (both branches it held are merged). Recommend `git worktree remove` at next session start; branches stay per `feedback_keep_feature_branches`.
+8. **Orphan branch `session/2026-04-27-Q-end`** (`09d4852`) still pending from Session Q.
 
 ## Files to Read for Context
 
-- **Verdict + reasoning (resume here):** `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration.md`.
-- **Machine-generated grid output:** `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration_run.md`.
-- **New harness:** `src/validation/baseline_robustness.py` (~430 LOC).
-- **Sprint 2 prior context:** `docs/rd_reports/2026-04-27_sprint2_robustness.md`.
+- **Sprint 2.5 spec (resume here):** `docs/sprints/sprint_02_5_physics_review.md`.
+- **Sprint 2 cleanup verdict:** `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration.md` (predictions + observations + verdict).
+- **Sprint 2 cleanup machine output:** `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration_run.md`.
+- **Baseline harness implementation:** `src/validation/baseline_robustness.py` (~430 LOC).
 - **Sprint 3 spec (deferred, not blocked):** `docs/sprints/sprint_03_provenance_closure.md`.
+- **Physics signal source (Sprint 2.5 target):** `src/score/physics.py`, `src/world/graph.py:compute_zone_flux`, `src/score/fusion.py` (sigma_coarse normalization).
 
 ## What To Do Next
 
-**Recommended path (not committed):**
+**Recommended sequence for next session:**
 
-1. **Review the open PR** (`auto/sprint2-baseline-recalibration`).
-2. **Sprint 2.5 — Signal Architecture Review (proposed, ~2-3 day R&D pass):**
-   - Ablate sigma_coarse, delta_f, bridge_new (low/no discrimination).
-   - Evaluate per-actor calibration (actor-history-depth as confidence modifier).
-   - Run against real GCP sandbox traffic to bound the synthetic FP floor.
-   - Output: signal redesign plan or empirical confirmation that current signals suffice on real benign.
-3. **Or proceed directly to Sprint 3** with eyes open: closure work is justified by closure_gap=3.3x discrimination; provenance integration is independent of the physics thesis. Decline Phase B B1 until signal review.
+1. Confirm mode — R&D (Sprint 2.5 execution involves discussion-shaped decisions, not autonomous-shaped).
+2. Branch `rd/sprint2-5-physics-review` off latest main.
+3. Write `docs/rd_reports/2026-05-XX_sprint2_5_physics_review.md` header with frozen predictions (copy from spec).
+4. Day 1: implementation probe → calibration probe → concept probe. Stop at first failed probe.
+5. Present Day 1 findings; user checkpoint; signoff on Day 2 path.
+6. Day 2: single-shot fix.
+7. Day 3: verdict per falsifier table; update CLAUDE.md framing; commit + PR.
 
-**Alternative paths:**
-- **Proceed with Sprint 3 + Phase B B1 as originally scoped** — risk: building cross-actor/cross-window layers on top of weak per-actor signals compounds noise.
-- **Reframe project entirely** — if signal architecture review concludes current signals can't generalize, the moment to revisit core hypotheses.
+**Alternate paths:**
+- Skip Sprint 2.5 and proceed directly to Sprint 3 closure work — closure_gap discrimination justifies it independently. Risk: leaves the physics question unresolved and forces it later when bigger decisions are pending.
+- Run real GCP sandbox baseline first to bound the synthetic FP floor — separate axis but informative. Better to do AFTER Sprint 2.5 verdict (mixing variables otherwise).
 
-## Open the PR
+## Sprint 2.5 quick-reference
 
-PR `auto/sprint2-baseline-recalibration` opened by autonomous agent (Session S). Per autonomous mode failsafe, the agent did NOT merge. The PR is the review boundary.
-
-Time spent this session: ~2 hours wall clock (autonomous, single agent).
+- **Falsifier:** ≥2.0x = standard weight; 1.5–2.0x = low weight; <1.5x = retire (set weight=0, amend CLAUDE.md framing to "aspirational").
+- **Discrimination ratio = max(attack_fire/benign_fire, attack_mean/benign_mean)** on existing PR #37 data.
+- **Default Branch C signal:** KL divergence between action-type distributions across consecutive windows.
+- **Stop-and-rescope:** if Day 1 surprises, stop the sprint, don't expand.

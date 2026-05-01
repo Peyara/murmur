@@ -6,6 +6,60 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-30 — R&D — Session S addendum: post-merge discussion + Sprint 2.5 design
+
+Continuation of Session S after PR #37 merged. Captures the architecture-review discussion and the Sprint 2.5 spec landed via PR #38.
+
+**Key turn in the discussion: I overshot the "physics is dead" verdict.**
+
+User pushed back on the FAIL-branch recommendation that suggested dropping physics signals. Explicit acknowledgement: I conflated *empirical refutation* (sigma_coarse / delta_f at 0% across two harness configs) with *mechanistic refutation* (analog itself is wrong). The 0% pattern is suspiciously clean — bugs and calibration mismatches produce that shape; conceptual failures usually leave a tail. Updated prior:
+
+| Outcome | Probability | Reasoning |
+|---|---|---|
+| A: Implementation bug | 35% | Clean 0% across two harnesses suggests degenerate computation. |
+| B: Calibration mismatch | 30% | `SIGMA_SIGMOID_X0=3.0` has no documented basis; raw values may live below sigmoid floor. |
+| C: Conceptual mismatch | 25% | "Zone-flux variance" is one analog; KL divergence on action-distributions, zone-crossing entropy, detailed balance are alternatives. |
+| D: Genuinely refuted | 10% | Even if literal sigma_coarse fails, *some* physics-flavored signal should discriminate. |
+
+65% mass in (A) or (B) — fixable, not rebuilds. The user's intuition that physics deserves another shot is empirically supported.
+
+**Sprint 2.5 designed and merged (PR #38).**
+
+Spec at `docs/sprints/sprint_02_5_physics_review.md`. 2-3 day R&D pass with falsifier locked at ≥1.5x discrimination ratio BEFORE Day 1. Day 1 = diagnostics only (three probes: bug / calibration / concept), explicit user-checkpoint before Day 2 fix attempt. Single-shot fix on Day 2 (no tweak-and-retry). Stop-and-rescope clause if Day 1 surfaces deeper architectural issue.
+
+**User decisions on falsifier shape:**
+- **Falsifier strictness: looser** — 1.5x (not 2.0x). 1.5–2.0x range = keep at low fusion weight; ≥2.0x = standard weight; <1.5x = retire.
+- **Conceptual-mismatch substitute: KL divergence first**, defer final choice to Day 1 review output (alternates: zone-crossing entropy, detailed-balance violation).
+- **Branding decision:** keep "physics-informed" framing regardless of technical outcome. Prototype, real world is messy. Risk noted: marketing claim accumulates debt if external pitches happen.
+- **Scope discipline:** stop and re-scope if Day 1 surprises, don't expand the sprint.
+
+**Anti-confirmation guards baked into the sprint:**
+- Falsifier locked numerically before any code opens
+- Test on existing PR #37 distributions only (no fresh-friendly data)
+- One fix attempt per failure layer
+- Predict before each fix; record divergence
+- Day 1 → user checkpoint → Day 2 (no autonomous drift past checkpoint)
+- "Almost" rationalizations rejected — 1.49x is retirement, not "near miss"
+
+**Standards / framework principles surfaced (candidates for CLAUDE.md):**
+
+1. **Detection rate without FP floor is meaningless.** Threshold reports must include benign distribution P95. (Project — Threshold Discipline)
+2. **Predict the failure *mode*, not just the signal.** Predict signal fire rates AND the shape of failure (architectural / methodological / harness-gap / signal-vs-noise gap). (Global — R&D)
+3. **Harness-gap as a third causal hypothesis.** "Methodological vs architectural" is incomplete; check harness wiring before debating the other two. (Global — Observe Before Hypothesize)
+4. **Predict-then-observe should include the FP floor / noise distribution.** Not just signal fire rates. (Project — Threshold Discipline)
+5. **Single-shot fix discipline in R&D pass.** First attempt is the data point. No tweak-and-retry. (Global — R&D)
+6. **Numerical falsifier locked before code opens.** Every R&D pass commits binary pass/fail criterion before work begins. (Global — R&D)
+
+**Process exception (one):** Implementation Communication Protocol (ELI10 + First Principles + Finding + Plan Update) was not used for Sprint 2 cleanup verdict. Used predict/observe/divergence/verdict instead — same substance, different format. Recommend amending CLAUDE.md to allow either format depending on audience (technical R&D vs non-engineer milestone).
+
+**Status at session close:**
+- PR #37 (Sprint 2 cleanup) merged → `f21fd13`
+- PR #38 (Sprint 2.5 spec) merged → `78e7ac6`
+- Sprint 2.5 execution: not started; next session
+- Sprint 3 partially blocked; Phase B B1 fully blocked
+
+---
+
 ### 2026-04-30 — R&D / Autonomous — Session S: Sprint 2 methodological cleanup → architectural FAIL confirmed
 
 **Session Summary**
