@@ -506,6 +506,75 @@ def robustness(grid_size: int, seed: int, parallel: int, output: str, include_ed
     click.echo(f"Report written to {output_path}")
 
 
+@cli.command("robustness-baseline")
+@click.option("--grid-size", type=int, default=50, help="Number of grid trajectories to sample.")
+@click.option("--seed", type=int, default=0, help="Master seed for grid sampling and per-trajectory generation.")
+@click.option("--baseline-seed", type=int, default=999, help="Seed for the benign baseline composition (fixed across all trajectories).")
+@click.option(
+    "--output",
+    default="docs/rd_reports/sprint2_baseline_recalibration_run.md",
+    type=click.Path(),
+    help="Output report path.",
+)
+@click.option("--include-edge-cases/--no-edge-cases", default=True, help="Include 5 hand-crafted edge cases.")
+def robustness_baseline(
+    grid_size: int, seed: int, baseline_seed: int, output: str, include_edge_cases: bool,
+):
+    """Sprint 2 methodological cleanup — attacks embedded in benign baseline + recalibration."""
+    from src.validation.baseline_robustness import (
+        aggregate_baseline_report,
+        edge_cases,
+        param_grid,
+        run_benign_only,
+        run_edges_in_baseline,
+        run_grid_in_baseline,
+    )
+
+    click.echo(f"Generating benign-only floor (seed={baseline_seed})...")
+    benign_floor = run_benign_only(baseline_seed)
+    click.echo(
+        f"  benign-only: n={benign_floor.n_pairs} (window, actor) pairs, "
+        f"P95={benign_floor.p95:.3f}, max={benign_floor.max_residual:.3f}"
+    )
+
+    grid_params = param_grid(grid_size=grid_size, seed=seed)
+    click.echo(
+        f"Running attack-in-benign grid: {len(grid_params)} trajectories, "
+        f"baseline_seed={baseline_seed}"
+    )
+    grid_results = run_grid_in_baseline(grid_params, baseline_seed=baseline_seed)
+    click.echo(f"  grid: {len(grid_results)} succeeded")
+
+    edge_results = []
+    if include_edge_cases:
+        edges = edge_cases()
+        click.echo(f"Running {len(edges)} edge cases in baseline")
+        edge_results = run_edges_in_baseline(edges, baseline_seed=baseline_seed)
+
+    if not grid_results:
+        click.echo("No successful grid runs.", err=True)
+        sys.exit(1)
+
+    report = aggregate_baseline_report(grid_results, edge_results, benign_floor)
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report.to_markdown())
+
+    click.echo(
+        f"\nDetection rate (current thresholds, attack-in-benign): "
+        f"{report.detection_rate_in_baseline*100:.1f}%"
+    )
+    click.echo(
+        f"Detection rate (recalibrated, attack-in-benign): "
+        f"{report.detection_rate_recalibrated*100:.1f}%"
+    )
+    click.echo(
+        f"Recalibrated WATCH={report.recalibrated.watch:.3f} "
+        f"(benign P95 floor={report.recalibrated.benign_p95:.3f})"
+    )
+    click.echo(f"Report written to {output_path}")
+
+
 @cli.command("ablate")
 @click.option("--db-path", default=None, help="Path to DuckDB file.")
 @click.option("--output", default="docs/rd_reports/closure_ablation.md", help="Output report path.")

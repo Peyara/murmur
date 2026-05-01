@@ -6,6 +6,66 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-30 — R&D / Autonomous — Session S: Sprint 2 methodological cleanup → architectural FAIL confirmed
+
+**Session Summary**
+- Mode: Autonomous, R&D pass. Worktree: `/Users/shamreeniram/Desktop/Peyara/Murmur-baseline-recalib`. Branch: `auto/sprint2-baseline-recalibration` off main (post-PR #36 merge `e3d3ea4`).
+- Goal: resolve Sprint 2's methodological-vs-architectural ambiguity. Embed attack trajectories in benign baseline, recalibrate thresholds against the resulting distribution + a benign-only FP floor.
+- Predict-then-observe: predictions committed at the head of `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration.md` BEFORE any code ran.
+- Files added: `src/validation/baseline_robustness.py` (~430 LOC), `tests/test_baseline_robustness.py` (9 tests), `src/cli.py` +`robustness-baseline` subcommand. 575 tests pass.
+- Reports: `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration.md` (predictions + observations + verdict), `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration_run.md` (machine-generated grid output).
+
+**Verdict: FAIL at safe FP thresholds, but with clearer diagnosis than Sprint 2.**
+
+| Regime | Threshold | Detection rate | Reading |
+|---|---|---|---|
+| Mode A (Sprint 2 attack-only, reproduced) | WATCH=0.20 | 40% | Original FAIL. |
+| Mode B (attack-in-benign) | WATCH=0.20 | **92%** | Garbage detection — benign FP floor crosses threshold. |
+| Mode B + recalibrated | WATCH=**0.428** | **30%** | Honest detection rate at safe FP. |
+
+**Key Finding 1: Three causes for Sprint 2's 0% physics/closure fire rate, not two.**
+The Sprint 2 R&D report named methodological vs architectural as competing hypotheses. The actual breakdown:
+1. **Methodological** (real for closure, novelty, bridge): closure_gap went from 0% → 100% under benign baseline. bridge_new went from 40% → 100%. The Sprint 2 attack-only mode genuinely prevented these from firing.
+2. **Architectural** (confirmed for physics): sigma_coarse and delta_f stayed at 0% on attack and ~5% on benign even with full baseline + watches wired. These signals are dead.
+3. **Harness gap** (closure-only): Sprint 2's `robustness.py` inserts events via `insert_event` and never calls `create_watch` / `try_close_watch`. Production `fetch_and_ingest` wires both. The new harness fixes this.
+
+**Key Finding 2: Recalibration revealed signal-vs-noise gap is the bottleneck, not threshold choice.**
+Benign-only residual_risk distribution: P50=0.157, P75=0.289, P95=0.375, max=0.696. Attack distribution P75=0.428. Attack and benign distributions are nearly overlapping — the gap between attack P75 and benign P95 is just 0.05. Recalibrated WATCH=0.428 is bound from below by benign P95. Threshold has nowhere to safely move.
+
+**Key Finding 3: closure_gap is the strongest discriminator (3.3x), inv_score moderate (2.2x), bridge_new minimal (1.2x).**
+Discrimination ratio = (attack fire rate / benign fire rate). bridge_new fires on 81% of benign — almost universal — so its 100% on attack is barely informative. closure_gap (100% / 31% = 3.3x) is the only signal with strong attack-vs-benign separation.
+
+**Key Finding 4: Multi-actor CLASS-WIPE persists post-recalibration (8.7%).** Same as Sprint 2.
+**Direct/none/full clusters also remain low (11.1% / 11.1% / 20.0%) under recalibration.** Cleanest attacks barely register above noise floor. This is a structural problem, not a threshold problem.
+
+**Predictions divergence (predict-then-observe):**
+- ✅ Got methodological mechanism right for closure_gap, bridge_new, inv_score.
+- ❌ Wrong direction for sigma_coarse / delta_f. Predicted methodological recovery; got architectural confirmation.
+- ❌ Missed the FP floor. Predicted Mode B current-threshold ~70%, recalibrated ~80%. Observed 92% / 30% — the inversion was caused by benign distribution overlap I didn't anticipate.
+- The over-prediction on `sigma_coarse` / `delta_f` activation is consistent with the **Sprint 2 over-prediction pattern on the same signals** — third independent observation that they don't activate. Pattern in over-predictions points to structural issue, not per-signal bug (CLAUDE.md R&D principle).
+
+**Recommendation tree decision: FAIL branch.**
+> _FAIL. Reframe — physics works but generalization is poor; redesign needed before any new layer._
+
+Concrete next moves (in priority order):
+1. Drop or replace sigma_coarse and delta_f. They've failed 0% on attack across two harness configurations.
+2. Re-examine signal-vs-noise gap. Either tighten synthetic baseline (it may be over-noisy) or add per-actor calibration (worker history depth as a confidence modifier).
+3. Phase B B1 (TGN+TPP) is justified for class-wipes BUT requires fixing per-window signals first; otherwise compounds noise.
+4. Sprint 3's closure work is partially validated (closure_gap = best discriminator). Closure semantics work; the bug was the harness.
+
+**Do NOT proceed to Sprint 3 or Phase B B1 as currently scoped.** Insert a "signal architecture review" R&D pass first (~2-3 days).
+
+**Principles surfaced for elevation to project CLAUDE.md:**
+1. **Detection rate without FP floor is meaningless.** Threshold reports must include benign distribution P95 (or equivalent FP bound). _Add to Threshold Discipline section._
+2. **Predict the failure mode along with the signal.** I committed predictions on which signals would fire, not on signal-vs-noise gap. The latter was the diagnostic finding.
+3. **Harness-gap as a third causal hypothesis.** When a signal is silent: methodological vs architectural is incomplete. Always check harness wiring first. _Add to Observe Before Hypothesize section._
+
+**Living-plan implications for next session:**
+- Sprint 2 R&D pass complete. Sprint 3 (provenance + closure full integration) **partially blocked** until signal architecture review.
+- Reasonable next sprint: "Sprint 2.5 — Signal architecture review" — 2-3 day R&D pass to ablate dead signals + evaluate per-actor calibration + run against real GCP sandbox traffic.
+
+---
+
 ### 2026-04-27 — R&D — Session R: Sprint 2 attack-strategy grid built + run → FAIL verdict with caveat
 
 **Session Summary**
