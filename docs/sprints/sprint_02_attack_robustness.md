@@ -113,30 +113,28 @@ The parameterized attack generator systematically covers the strategy space with
 
 This plan is the resume point. Pick up at the first unchecked Phase below.
 
-### Phase 1 — Attack Generator (`src/validation/attack_generator.py`)
+### Phase 1 — Attack Generator (`src/validation/attack_generator.py`) ✅ Session R
 
-- [ ] Define `AttackParams` dataclass with axes from the spec table: `speed`, `spread`, `zone_path`, `evasion`, `closure`, `objective`
-- [ ] Implement `generate_trajectory(params: AttackParams, seed: int) -> list[CanonicalEvent]` that produces deterministic, valid CanonicalEvent sequences
-  - Zone mappings correct per `src/world/zones.py`
-  - Action types valid per `src/ingest/canonical.py`
-  - Timestamps strictly ordered, intervals matching `speed`
+- [x] Define `AttackParams` dataclass with axes from the spec table: `speed`, `spread`, `zone_path`, `evasion`, `closure`, `objective`
+- [x] Implement `generate_attack(params: AttackParams, seed: int) -> AttackTrajectory` that produces deterministic, valid CanonicalEvent sequences (renamed from `generate_trajectory` to avoid collision with `src/synthetic/__init__.py`)
+  - Zone mappings correct per `src/schema.py:34-40` and `src/ingest/parser.py:29-63` (note: spec said `src/world/zones.py` and `src/ingest/canonical.py` — those are stale paths)
+  - Action types valid; timestamps strictly ordered; intervals matching `speed`
   - `trigger_ref` set directly on synthetic events (per spec line 85 — bypass correlation pipeline)
-  - Each trajectory carries metadata: param settings, expected zone path, expected signals
-- [ ] `tests/test_attack_generator.py`: validity checks (zones, timestamps, action types), determinism (same params + seed → same trajectory), edge-case coverage
+  - Each trajectory carries metadata: param settings, expected zone path, expected signals (predicted before observation as confirmation-bias guard)
+- [x] `tests/test_attack_generator.py`: 25 tests covering validity, determinism, evasion behaviors, closure balancing, multi-actor distinctness, expected-signals predictions, DB injection. All passing.
 
-### Phase 2 — Robustness Harness (`src/validation/robustness.py`)
+### Phase 2 — Robustness Harness (`src/validation/robustness.py`) ✅ Session R
 
-- [ ] `param_grid()` enumerator: 3 speeds × 2 spreads × 3 zone_paths × 4 evasions = 72 base combinations; sample 30-50 per spec
-- [ ] 5 hand-crafted edge cases per spec (slow ratchet, multi-actor convergence, EXFIL-avoiding path, perfect mimicry, single-event)
-- [ ] Per-trajectory scoring: inject into DuckDB → run full pipeline → record `fusion_raw`, `residual_risk`, signal activations, signal magnitudes, detection bool at current threshold (4.5/3.4/2.0 from PR #34)
-- [ ] `RobustnessReport`: detection rate by each param axis (speed / spread / zone_path / evasion / closure), most-robust signals, most-fragile signals, blind-spot combinations, failure-mode notes
-- [ ] CLI exposure: `murmur robustness --grid-size N --output docs/rd_reports/<date>_robustness.md`
+- [x] `param_grid()` enumerator: stratified sample over 72 base combinations (3 speeds × 2 spreads × 3 zone_paths × 4 evasions); guarantees ≥1 sample per (speed, evasion) cell. closure + objective randomized per sample.
+- [x] 5 hand-crafted edge cases (slow_ratchet, multi_actor_convergence, exfil_avoiding, perfect_mimicry, minimal_direct).
+- [x] Per-trajectory scoring: direct `insert_event` → world-model build → closure discovery → fusion + residual_risk; thresholds from `config/settings.py` (4.5/3.4/2.0 ÷ 10).
+- [x] `RobustnessReport.to_markdown()`: detection rate per param axis, signal fire rate + mean max activation, prediction divergence table (confirmation-bias guard), blind-spot enumeration, edge-case results.
+- [x] CLI exposure: `murmur robustness --grid-size N --seed S --parallel P --output PATH`. 11 tests passing.
 
-### Phase 3 — Run + Report
+### Phase 3 — Run + Report ✅ Session R
 
-- [ ] Run grid (~50 trajectories) + 5 edge cases against current pipeline
-- [ ] Generate report at `docs/rd_reports/2026-MM-DD_sprint2_robustness.md`
-- [ ] Cross-reference against `docs/rd_reports/2026-04-17_large_scale_validation_recalibrated.md` — does the strategy-grid failure mode match the per-window FN rate seen there?
+- [x] Ran grid: 50 trajectories + 5 edge cases. Output at `docs/rd_reports/2026-04-27_sprint2_robustness.md`.
+- [x] Cross-reference: the per-window FN rate from PR #34 (~68% at MEDIUM threshold) and the per-trajectory FN rate here (~60%) are roughly consistent. Both harnesses see the same threshold-sensitivity behavior — residual_risk for many attack regimes lands in the [0.15, 0.25] band, right around the WATCH threshold of 0.20.
 
 ### Phase 4 — Gate Decision (write decision into Findings Log + CURRENT_STATE)
 
@@ -169,7 +167,38 @@ This plan is the resume point. Pick up at the first unchecked Phase below.
 
 ## Findings Log
 
-_Updated as analysis runs:_
+### Session R (2026-04-27): Sprint 2 grid run + gate verdict
+
+**Gate verdict: FAIL with 2 CLASS-WIPE patterns.**
+
+| Metric | Value | Gate threshold | Verdict |
+|---|---|---|---|
+| Overall detection rate | 40% | ≥80% | FAIL (<60%) |
+| `split_actions` evasion class | 0% | >0% required | CLASS-WIPE |
+| `multi_actor` spread class | 8.7% | >0% required | Effective CLASS-WIPE |
+| Best class detection | `timing_jitter`: 69.2% | — | — |
+| Worst class detection | `split_actions`: 0% | — | — |
+
+**Three insights about signal behavior** (Sprint 2 spec required ≥2):
+
+1. **Multi-actor coordination is invisible to per-actor signals.** novelty_score and bridge_new are computed per-actor; spreading work across 4 actors disperses each below detection. `multi_actor_convergence` edge case (M-Trends 22-second handoff archetype) produced residual_risk=0.198 — NORMAL tier. This is a structural limitation of per-actor scoring.
+
+2. **Physics signals (sigma_coarse, delta_f) require benign baseline to activate.** Both fired on 0% of grid trajectories. Hypothesis: these are zone-flux *variance* signals that need a non-attack baseline to compute against. PR #34's harness mixes attackers + workers and produces non-zero physics signals; this attack-only harness produces zero. Cannot distinguish "physics is broken" from "physics needs baseline" without re-running with benign embedding.
+
+3. **Threshold sits exactly at the strategy-grid noise floor.** 26 of 30 blind spots have residual_risk in [0.15, 0.20], just below WATCH=0.20. A 0.19 threshold would flip detection from 40% to ~88%. The recalibrated thresholds (PR #34) tuned on a different distribution; they are not a transferable signal of detection capability across distributions.
+
+**Confirmation-bias guard outcome:**
+Predictions in `expected_signals` were committed before the run. Divergence concentrated on the 4 signals that fire on 0% of trajectories (sigma_coarse, delta_f, closure_gap, orphaned_priv) — every single prediction for those 4 was wrong. inv_score and bridge_new predictions held up. The over-prediction pattern aligns with the "physics signals need baseline" hypothesis.
+
+**Reframed reading of the FAIL:**
+The failure modes (multi-actor coordination, cross-window split actions) are exactly the regimes that Phase B B1's TGN+TPP is designed to address. The strict gate verdict says re-evaluate physics thesis before any new layer. The charitable reading (BORDERLINE branch in the gate table) says partial Phase B is justified when failures cluster on representation-learning regimes. The methodological gap (no benign baseline) makes the strict-vs-charitable choice ambiguous until the harness is rerun with benign embedding.
+
+**Recommended next move (R&D, not committed):**
+1. Re-run robustness grid with benign-traffic baseline embedded; resolve "physics broken" vs "physics needs baseline" ambiguity.
+2. Recalibrate thresholds on the strategy-grid distribution (P75/P90/P95 of residual_risk).
+3. Then choose: Phase B B1 (if multi-actor + cross-window failures persist) vs Sprint 3 closure repair (if closure_gap was the missing piece) vs Phase 2 signals (target_convergence, eddy_score).
+
+See full report: `docs/rd_reports/2026-04-27_sprint2_robustness.md`.
 
 ---
 

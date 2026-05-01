@@ -83,6 +83,14 @@ The goal: anyone reading the sprint doc can see exactly where we are, what we've
 
 ---
 
+## Threshold Discipline (Murmur Scoring)
+
+- **Per-distribution thresholds are not transferable signals of detection capability.** A detector scoring attack X at 0.198 with threshold 0.20 is identical to one scoring X at 0.45 with threshold 0.46 — the gap matters, the absolute value doesn't. When reporting calibrations, include distance-from-threshold and per-distribution percentiles (P75/P90/P95), not just above/below.
+- **Resist the threshold retune that makes a failing gate pass.** If the honest finding is "thresholds don't generalize across distributions," that's more valuable than a fabricated pass. Recalibrate as its own R&D pass with its own report, not as a fix-up of a current gate verdict.
+- **When introducing a new validation distribution, recompute thresholds from that distribution before applying old ones.** Recalibrated thresholds tuned on distribution A may sit exactly at the noise floor of distribution B (Sprint 2 finding: PR #34 thresholds left strategy-grid blind spots clustered at residual_risk=0.198 vs WATCH=0.20).
+
+---
+
 ## Secrets & Credentials
 
 - `.env` files with real values: NEVER commit (only `.env.example` with placeholders)

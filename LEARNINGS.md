@@ -6,6 +6,98 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-04-27 — R&D — Session R: Sprint 2 attack-strategy grid built + run → FAIL verdict with caveat
+
+**Session Summary**
+- Mode: R&D. Built Phase 1 (attack generator) + Phase 2 (robustness harness + CLI) + Phase 3 (50-trajectory grid + 5 edge cases) + Phase 4 (gate verdict + handoff) in one session. ~2.5 hours wall clock.
+- Branch: `feature/sprint2-attack-grid` off main (post-PR #34, `45e6ad4`).
+- Files: `src/validation/attack_generator.py` (300 LOC), `src/validation/robustness.py` (380 LOC), `src/cli.py` +`robustness` subcommand, `tests/test_attack_generator.py` (25 tests), `tests/test_robustness.py` (11 tests). All 36 new tests passing.
+- Report: `docs/rd_reports/2026-04-27_sprint2_robustness.md` (224 lines, includes auto-generated grid output + manual Findings/Interpretation).
+
+**Gate verdict: FAIL with 2 CLASS-WIPE patterns + 1 methodological caveat.**
+
+| Class | Detection | Verdict |
+|---|---|---|
+| Overall (50 trajectories) | 40% | FAIL (<60% per gate table) |
+| `split_actions` evasion | 0% | CLASS-WIPE |
+| `multi_actor` spread | 8.7% | Effective CLASS-WIPE |
+| `single_actor` spread | 66.7% | Above borderline |
+| `timing_jitter` evasion | 69.2% | Above borderline |
+
+**Key Finding 1: Threshold doesn't generalize across attack distributions (assumption check #2 confirmed)**
+26 of 30 blind spots cluster at residual_risk = 0.151–0.198, just below WATCH=0.20. Threshold flip from 0.20 → 0.19 would push detection from 40% to ~88%. The recalibrated thresholds (PR #34) were tuned on `seeds × actor_counts × attack_ratios × windows` distribution and do not transfer. **Implication:** thresholds are a per-distribution calibration parameter, not a transferable signal of detection capability.
+
+**Key Finding 2: Physics signals (sigma_coarse, delta_f) fire on 0% of attack-only trajectories**
+Both fired on 0/50 grid trajectories and 0/5 edge cases. Closure_gap and orphaned_priv also 0/50. inv_score (96% fire rate) is doing 95%+ of the detection work. The "physics-informed" framing is currently inaccurate at scale — the system is essentially an invariant-detector with calibration noise. **Two competing hypotheses:**
+1. Methodological: physics signals are zone-flux variance signals that need benign baseline; attack-only trajectories produce no flux to compute variance against.
+2. Architectural: physics signals are genuinely silent on attacks regardless of context.
+Cannot distinguish (1) from (2) with this harness; PR #34's harness embeds attackers in workers and produces non-zero physics signals, which is consistent with (1).
+
+**Key Finding 3: Multi-actor and cross-window blind spots are exactly Phase B B1's design target**
+The two CLASS-WIPE patterns:
+- multi_actor 8.7% — novelty_score and bridge_new are per-actor; coordinated attacks (M-Trends 22s handoff archetype) disperse below per-actor detection.
+- split_actions 0% — window-scoped scoring cannot correlate events across windows.
+Both are precisely the regimes that TGN (cross-actor temporal graph) and TPP (cross-window intensity) target. The literal FAIL verdict says re-evaluate physics; the spirit of the BORDERLINE branch ("partial Phase B may be right move if failures cluster on regimes representations help") fits this failure mode exactly.
+
+**Key Finding 4: Confirmation-bias guard worked — over-predictions were diagnostic**
+Predictions in `expected_signals` were committed in attack_generator.py before the run. Divergence concentrated on the 4 silent signals (sigma_coarse, delta_f, closure_gap, orphaned_priv) — every prediction wrong. inv_score and bridge_new predictions held up. The over-prediction pattern aligns with the "physics needs baseline" hypothesis: I predicted physics would fire because I expected attack-shape variance to register; observing 0% across 50 trajectories pinpoints that the variance computation needs a non-attack reference.
+
+**Key Finding 5: Single PR multi-commit shape worked for R&D iteration**
+Branch `feature/sprint2-attack-grid` carried 4 logical commits: attack_generator → robustness harness + CLI → grid output → handoff docs. Each commit isolatable; PR is reviewable as a unit. This worked for a 2.5-hour R&D session because the gate evidence is the deliverable; cleaner than 4 separate PRs would have been.
+
+**Learning Loop (CLAUDE.md, run at gate)**
+
+1. **What did we assume?** That physics-informed signals (sigma_coarse, invariants, novelty, bridge_new, delta_F) hold across varied attack strategies. That recalibrated thresholds (4.5/3.4/2.0) generalize. That attack-only trajectories are sufficient for testing scoring robustness. That direct `insert_event` is equivalent to JSONL→parser path for scoring.
+2. **What did we observe?** sigma_coarse + delta_f fire 0% on attack-only data (assumption broke). Threshold sits exactly at noise floor — 0.198 vs 0.20 (assumption broke). multi_actor + split_actions are blind spots regardless of speed/zone_path/closure (new finding). inv_score is 95% of the lifting (new finding). Direct insert path works (assumption held).
+3. **What broke?** "Physics signals are robust" — broken on attack-only. "Recalibrated thresholds generalize" — broken on strategy distribution. "5 expected_signals predictions were reasonable" — 4 of 5 wrong on majority of trajectories. "single attack trajectory is enough to validate detection" — broken; attacks need benign embedding to produce flux variance.
+4. **How did we adapt?** Wrote interpretation as FAIL with methodological caveat rather than declaring physics thesis dead. Recommended re-run with benign baseline before committing to Phase B B1 vs redesign. Did NOT silently retune the threshold to make the gate pass.
+5. **What principles emerge?**
+   - **Validation harnesses must include realistic baseline traffic, not just attack signal.** Variance-based detectors return zero on pure-signal input. (Promote to project-level CLAUDE.md if it recurs across projects.)
+   - **Per-distribution thresholds aren't transferable signals.** A detector that scores attack X at 0.198 with threshold 0.20 is identical to one that scores X at 0.45 with threshold 0.46 — the gap matters, the absolute value doesn't. Future calibrations should report distance-from-threshold, not above/below.
+   - **Confirmation-bias guard via committed predictions catches the right thing.** When predictions are wrong on the same signals that fire 0%, the over-prediction itself is the diagnostic.
+6. **What would we do differently next time?** Build the benign-baseline integration into the FIRST grid run, not as a follow-up. Spec-line-85 ("synthetic events bypass correlation") is correct for ingestion-bypass but wrong for scoring-isolation — physics signals need realistic flux context. Should have probed sigma_coarse on a 1-trajectory smoke test BEFORE building the full grid; would have caught the 0%-fire issue in 5 minutes instead of after a 50-run grid.
+
+**Decisions**
+
+| Decision | Alternatives considered | Why rejected |
+|---|---|---|
+| Direct CanonicalEvent injection (per spec line 85) | Composer raw-dict path through parser | Sprint 2 tests scoring not parsing; direct path is simpler and per-spec. Confirmed working via assumption check #1. |
+| Single PR with 4 commits | Multiple PRs by phase | R&D iteration; gate evidence is one unit; review is cleaner |
+| Report verdict as "FAIL with caveat" not "FAIL" | Strict FAIL per table; pretend pass with retuned threshold | Strict FAIL ignores the methodological gap; retuning is confirmation bias. The honest reading is both. |
+| Document multi-actor blind spot as Phase B B1 fit | Document as universal failure | Per-actor scoring is the structural cause; TGN literally addresses cross-actor correlation. The fit is real. |
+| Defer threshold recalibration to next session | Retune in this PR | Keeping the harness output reproducible; retuning requires its own R&D pass with benign embedding |
+
+**Exceptions to standard practice (R&D mode)**
+- Tests not strict TDD — tests written alongside implementation in the same session (allowed in R&D mode).
+- DRY refactor between large_scale.py and robustness.py deferred — flagged as `fix/` PR after gate.
+- 4-commit single PR — bundled per gate-as-unit principle (allowed; first time using this pattern in R&D).
+
+**Open Questions**
+1. Does sigma_coarse / delta_f fire when attacks are embedded in benign traffic? Needs a "robustness with baseline" harness variant.
+2. What's the right calibrated threshold on the strategy-grid distribution? P75/P90/P95 should be computed from the run output.
+3. Is the multi-actor blind spot fillable by `target_convergence` (Phase 2 signal per spec line 101) or only by Phase B B1 TGN?
+4. Should `expected_signals` predictions be a permanent part of robustness output (across all R&D harnesses)? The confirmation-bias guard is genuinely useful.
+5. Orphan branch `session/2026-04-27-end` (Open Blocker #5 from Session Q) still pending. Not addressed this session.
+6. PR open decision deferred — 4 commits on `feature/sprint2-attack-grid` ready to push but not pushed.
+
+**CLAUDE.md Evolution Candidates (session-end addendum)**
+
+1. **Predict-then-observe in R&D harnesses (PROMOTE to project CLAUDE.md).** Commit predictions about which signals should fire BEFORE the run, then report divergence. The over-prediction pattern was itself diagnostic this session — sigma_coarse/delta_f/closure_gap/orphaned_priv predictions were all wrong, and the fact that those four predictions were wrong on the same trajectories is what pointed to the "physics needs benign baseline" hypothesis.
+
+2. **"FAIL with caveat" — separate methodological from architectural failures (PROMOTE to global CLAUDE.md, R&D discipline section).** When validation fails, distinguish (a) harness gap / calibration error / data limitation from (b) the thesis is wrong. The next move differs. Collapsing both into "FAIL" is intellectually dishonest and produces wrong next-step decisions. This session's strict FAIL would have rejected Phase B B1; the methodological-vs-architectural split shows Phase B B1 might still be the right move pending a benign-baseline re-run.
+
+3. **Resist threshold retune that makes gate pass (PROMOTE to project CLAUDE.md anti-confirmation-bias).** 0.198 vs 0.20 was a tempting flip from 40%→88% detection. The honest finding (thresholds don't transfer across distributions) is more valuable than a fabricated pass.
+
+4. **Per-distribution thresholds aren't transferable signals (PROMOTE to project CLAUDE.md scoring-discipline).** Calibrations should report distance-from-threshold, not above/below. A detector scoring attack X at 0.198 with threshold 0.20 is identical to one scoring X at 0.45 with threshold 0.46.
+
+5. **Stratified sampling for no-class-wipe guarantee (WATCH).** Useful pattern; not yet recurring across projects.
+
+**Standards Candidates (Step 6.5)**
+
+Reviewed for cross-project promotion to `peyara-standards/`. Two strong candidates surfaced — both surface to user for sign-off rather than auto-write because they touch user-level CLAUDE.md (high-privilege).
+
+---
+
 ### 2026-04-27 — Production — Session Q: Divergence recovery + validation merge + Sprint 2 pivot plan
 
 **Session Summary**
