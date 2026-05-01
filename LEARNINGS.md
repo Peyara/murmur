@@ -78,6 +78,23 @@ Branch `feature/sprint2-attack-grid` carried 4 logical commits: attack_generator
 3. Is the multi-actor blind spot fillable by `target_convergence` (Phase 2 signal per spec line 101) or only by Phase B B1 TGN?
 4. Should `expected_signals` predictions be a permanent part of robustness output (across all R&D harnesses)? The confirmation-bias guard is genuinely useful.
 5. Orphan branch `session/2026-04-27-end` (Open Blocker #5 from Session Q) still pending. Not addressed this session.
+6. PR open decision deferred — 4 commits on `feature/sprint2-attack-grid` ready to push but not pushed.
+
+**CLAUDE.md Evolution Candidates (session-end addendum)**
+
+1. **Predict-then-observe in R&D harnesses (PROMOTE to project CLAUDE.md).** Commit predictions about which signals should fire BEFORE the run, then report divergence. The over-prediction pattern was itself diagnostic this session — sigma_coarse/delta_f/closure_gap/orphaned_priv predictions were all wrong, and the fact that those four predictions were wrong on the same trajectories is what pointed to the "physics needs benign baseline" hypothesis.
+
+2. **"FAIL with caveat" — separate methodological from architectural failures (PROMOTE to global CLAUDE.md, R&D discipline section).** When validation fails, distinguish (a) harness gap / calibration error / data limitation from (b) the thesis is wrong. The next move differs. Collapsing both into "FAIL" is intellectually dishonest and produces wrong next-step decisions. This session's strict FAIL would have rejected Phase B B1; the methodological-vs-architectural split shows Phase B B1 might still be the right move pending a benign-baseline re-run.
+
+3. **Resist threshold retune that makes gate pass (PROMOTE to project CLAUDE.md anti-confirmation-bias).** 0.198 vs 0.20 was a tempting flip from 40%→88% detection. The honest finding (thresholds don't transfer across distributions) is more valuable than a fabricated pass.
+
+4. **Per-distribution thresholds aren't transferable signals (PROMOTE to project CLAUDE.md scoring-discipline).** Calibrations should report distance-from-threshold, not above/below. A detector scoring attack X at 0.198 with threshold 0.20 is identical to one scoring X at 0.45 with threshold 0.46.
+
+5. **Stratified sampling for no-class-wipe guarantee (WATCH).** Useful pattern; not yet recurring across projects.
+
+**Standards Candidates (Step 6.5)**
+
+Reviewed for cross-project promotion to `peyara-standards/`. Two strong candidates surfaced — both surface to user for sign-off rather than auto-write because they touch user-level CLAUDE.md (high-privilege).
 
 ---
 
