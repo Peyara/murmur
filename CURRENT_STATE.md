@@ -4,51 +4,49 @@
 
 ## Active Sprint
 
-**Sprint 2.5 — Physics Signal Architecture Review.** Spec merged (PR #38, commit `78e7ac6`); execution not yet started. 2-3 day R&D pass with falsifier locked at ≥1.5x discrimination ratio before Day 1.
+**Sprint 2.5 — Physics Signal Architecture Review.** Now evidence-grounded by a deep-research pass
+(2026-07-01). Verdict: physics failure is most likely an **instrument mismatch** (Schnakenberg
+cycle-current estimator is structurally wrong for acyclic attack flows), NOT an impoverished sandbox
+and NOT a disproven thesis. Execution of the diagnostic (step 2) not yet started.
 
 ## Last Completed Milestone
 
-Session S (2026-04-30, autonomous + R&D discussion): Sprint 2 methodological cleanup merged via PR #37 (commit `f21fd13`). Sprint 2.5 spec designed and merged via PR #38 (commit `78e7ac6`). Both PRs merged by user.
+**2026-07-01 (R&D):** Fresh-eyes physics review. Deep-research (5 angles, 21 sources) complete.
+Report: `docs/rd_reports/2026-07-01_physics_signal_research.md`. Committed on branch `gut-renovation`
+to pick up tomorrow. User has NOT finished reading the report yet.
 
 ## Open Blockers / Questions
 
-1. **Sprint 2.5 execution.** Branch `rd/sprint2-5-physics-review` off main. Day 1 = three diagnostic probes (bug/calibration/concept) on `sigma_coarse` and `delta_f`. **User-review checkpoint required between Day 1 and Day 2.**
-2. **Predictions for Sprint 2.5 must be committed BEFORE Day 1.** Spec already lists prior probabilities (35/30/25/10 for bug/calibration/concept/refuted); these need to land in the new R&D report at sprint kickoff.
-3. **Synthetic baseline noise.** Benign-only P95=0.375 in PR #37 may be a synthetic artifact. Testable on existing GCP sandbox. Deferred until Sprint 2.5 verdict to avoid mixing variables.
-4. **Sprint 2.6 (proposed).** Same protocol applied to `novelty` and `bridge_new` (both 1.2x discrimination). Deferred until 2.5 protocol is validated.
-5. **Sprint 3 (provenance/closure full integration).** Partially blocked. closure_gap (3.3x) is independently validated; closure work is justified.
-6. **Phase B B1 (TGN/TPP).** Fully blocked pending Sprint 2.5 + 2.6.
-7. **Worktree cleanup.** `/Users/shamreeniram/Desktop/Peyara/Murmur-baseline-recalib` worktree purpose fulfilled (both branches it held are merged). Recommend `git worktree remove` at next session start; branches stay per `feedback_keep_feature_branches`.
-8. **Orphan branch `session/2026-04-27-Q-end`** (`09d4852`) still pending from Session Q.
+1. **Read the report.** User paused mid-report — `docs/rd_reports/2026-07-01_physics_signal_research.md`
+   §4 (the S=6 correction) and §6 (step-2 design) are the parts to finish.
+2. **Step 2 = real-data observation** on real GCP benign traffic (no attack labels): measure (a) **edge
+   reciprocity** [load-bearing — how often does i→j come with j→i?], (b) transition density per window
+   vs the corrected S=6 floor (~20), (c) whether persistent cycle currents exist at all.
+3. **Free check first:** disaggregate PR #37's 0%/5% by attack subclass (aggregation may mask a
+   physics niche on cyclic-recon attacks). No new data needed.
+4. **Likely endgame:** replace instrument (Sprint 2.5 Branch C) — a directed one-way flux / KL measure
+   that scores acyclic exfil as maximally irreversible instead of undefined. Contingent on reciprocity.
+5. **Global vs Peyara CLAUDE.md inconsistency** — global not amended this session; decide sync path.
+6. **peyara-standards CLAUDE.md change uncommitted** (separate repo) — commit decision pending.
 
 ## Files to Read for Context
 
-- **Sprint 2.5 spec (resume here):** `docs/sprints/sprint_02_5_physics_review.md`.
-- **Sprint 2 cleanup verdict:** `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration.md` (predictions + observations + verdict).
-- **Sprint 2 cleanup machine output:** `docs/rd_reports/2026-04-30_sprint2_baseline_recalibration_run.md`.
-- **Baseline harness implementation:** `src/validation/baseline_robustness.py` (~430 LOC).
-- **Sprint 3 spec (deferred, not blocked):** `docs/sprints/sprint_03_provenance_closure.md`.
-- **Physics signal source (Sprint 2.5 target):** `src/score/physics.py`, `src/world/graph.py:compute_zone_flux`, `src/score/fusion.py` (sigma_coarse normalization).
+- **Resume here:** `docs/rd_reports/2026-07-01_physics_signal_research.md` (full synthesis + step-2 design).
+- Raw research: `docs/rd_reports/2026-07-01_physics_research_raw.json`.
+- Sprint spec: `docs/sprints/sprint_02_5_physics_review.md`.
+- Physics source: `src/score/physics.py`, `src/world/graph.py:compute_zone_flux`.
+- This session's learnings: `LEARNINGS.md` top entry.
 
 ## What To Do Next
 
-**Recommended sequence for next session:**
+1. Confirm mode — R&D. Branch `gut-renovation` is already checked out (findings committed there).
+2. Finish reading the 2026-07-01 report (§4 S=6 correction, §6 step-2 design).
+3. Run the FREE check: disaggregate PR #37 physics fire-rates by attack subclass.
+4. Design + run step 2: real-GCP edge-reciprocity + density observation harness. Predict-then-observe.
+5. Decide instrument-replacement (Branch C) based on the reciprocity result.
 
-1. Confirm mode — R&D (Sprint 2.5 execution involves discussion-shaped decisions, not autonomous-shaped).
-2. Branch `rd/sprint2-5-physics-review` off latest main.
-3. Write `docs/rd_reports/2026-05-XX_sprint2_5_physics_review.md` header with frozen predictions (copy from spec).
-4. Day 1: implementation probe → calibration probe → concept probe. Stop at first failed probe.
-5. Present Day 1 findings; user checkpoint; signoff on Day 2 path.
-6. Day 2: single-shot fix.
-7. Day 3: verdict per falsifier table; update CLAUDE.md framing; commit + PR.
+## Branch note
 
-**Alternate paths:**
-- Skip Sprint 2.5 and proceed directly to Sprint 3 closure work — closure_gap discrimination justifies it independently. Risk: leaves the physics question unresolved and forces it later when bigger decisions are pending.
-- Run real GCP sandbox baseline first to bound the synthetic FP floor — separate axis but informative. Better to do AFTER Sprint 2.5 verdict (mixing variables otherwise).
-
-## Sprint 2.5 quick-reference
-
-- **Falsifier:** ≥2.0x = standard weight; 1.5–2.0x = low weight; <1.5x = retire (set weight=0, amend CLAUDE.md framing to "aspirational").
-- **Discrimination ratio = max(attack_fire/benign_fire, attack_mean/benign_mean)** on existing PR #37 data.
-- **Default Branch C signal:** KL divergence between action-type distributions across consecutive windows.
-- **Stop-and-rescope:** if Day 1 surprises, stop the sprint, don't expand.
+`gut-renovation` off `main` holds this session's report, raw research, and handoff files. The name
+signals the intent: this may become a larger simplification/de-sprawl of the scoring stack, not just a
+physics fix (closure_gap 3.3x + inv_score 2.2x carry the system; ~8 other signals underperform).
