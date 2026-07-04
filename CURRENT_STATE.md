@@ -1,52 +1,47 @@
 # Murmur — Current State
 
-> This file is the resume point for new sessions. Read this first.
+> Resume point for new sessions. Read this first.
 
-## Active Sprint
+## Active work
 
-**Sprint 2.5 — Physics Signal Architecture Review.** Now evidence-grounded by a deep-research pass
-(2026-07-01). Verdict: physics failure is most likely an **instrument mismatch** (Schnakenberg
-cycle-current estimator is structurally wrong for acyclic attack flows), NOT an impoverished sandbox
-and NOT a disproven thesis. Execution of the diagnostic (step 2) not yet started.
+**Physics-signal falsification bake-off** (`bakeoff/`). Autonomous session 2026-07-03 produced an
+**INTERIM verdict: strong KILL-lean** on the physics irreversibility signal. See
+`bakeoff/DECISION_MEMO.md` (the single deliverable) and `bakeoff/AUTONOMOUS_SESSION_LOG.md` (every
+judgment call I took while you were out, for review).
 
-## Last Completed Milestone
+## Headline finding
 
-**2026-07-01 (R&D):** Fresh-eyes physics review. Deep-research (5 angles, 21 sources) complete.
-Report: `docs/rd_reports/2026-07-01_physics_signal_research.md`. Committed on branch `gut-renovation`
-to pick up tomorrow. User has NOT finished reading the report yet.
+On a balanced dev landscape (20 campaigns/flavor, LOTL present):
+- **P1e (excess/nonadiabatic EP) is structurally blind to living-off-the-land** (×0.01 vs benign) —
+  LOTL preserves the actor's own edge distribution, so `D_KL(window‖baseline)≈0` by construction.
+- **P2 (flux) discriminates nothing** — benign housekeeping is maximal.
+- P1e's only strong win (ServiceAccountHijack ×7.55) coincides with a **landscape leak** a dumb shallow
+  cheat detector also catches (AUC-PR 0.70) → not evidence of independent physics value.
+- The reformulation *did* solve its confound (benign housekeeping → 0.000), but that revealed the signal
+  has nothing left to catch.
 
-## Open Blockers / Questions
+## Not yet done (blocks a FINAL gated verdict)
 
-1. **Read the report.** User paused mid-report — `docs/rd_reports/2026-07-01_physics_signal_research.md`
-   §4 (the S=6 correction) and §6 (step-2 design) are the parts to finish.
-2. **Step 2 = real-data observation** on real GCP benign traffic (no attack labels): measure (a) **edge
-   reciprocity** [load-bearing — how often does i→j come with j→i?], (b) transition density per window
-   vs the corrected S=6 floor (~20), (c) whether persistent cycle currents exist at all.
-3. **Free check first:** disaggregate PR #37's 0%/5% by attack subclass (aggregation may mask a
-   physics niche on cyclic-recon attacks). No new data needed.
-4. **Likely endgame:** replace instrument (Sprint 2.5 Branch C) — a directed one-way flux / KL measure
-   that scores acyclic exfil as maximally irreversible instead of undefined. Contingent on reciprocity.
-5. **Global vs Peyara CLAUDE.md inconsistency** — global not amended this session; decide sync path.
-6. **peyara-standards CLAUDE.md change uncommitted** (separate repo) — commit decision pending.
+1. **De-rig the landscape.** Fairness gate FAILS: shallow features (`edge_diversity_ratio`, degree)
+   separate SA-hijack (0.70) and cred-theft (0.54). Generator must equalize those between attacks and
+   their hard-negative twins. (LOTL's physics-death does NOT depend on this — it's robust.)
+2. **Build B1 (Hopper-core) + per-instance detection@budget.** The gated criterion is "physics beats B1
+   by ≥5pp." Prediction after both: **KILL**.
 
-## Files to Read for Context
+## What's built and working (reusable regardless of verdict)
 
-- **Resume here:** `docs/rd_reports/2026-07-01_physics_signal_research.md` (full synthesis + step-2 design).
-- Raw research: `docs/rd_reports/2026-07-01_physics_research_raw.json`.
-- Sprint spec: `docs/sprints/sprint_02_5_physics_review.md`.
-- Physics source: `src/score/physics.py`, `src/world/graph.py:compute_zone_flux`.
-- This session's learnings: `LEARNINGS.md` top entry.
+- `bakeoff/worldgen/` — balanced per-flavor campaign generator (attack-instance = eval unit), anonymizer,
+  hard negatives. `bakeoff/detectors/` — P1e (excess-EP), P2 (flux), P1 (legacy KL). `bakeoff/harness/` —
+  per-instance eval + `dev_read.py`. `bakeoff/audits/` — instance-grouped leakage red-team, fairness,
+  grep-leak. `bakeoff/PREDICTIONS.md` (frozen predictions + physics-formulation decision), `SCOPE.md`
+  (anti-sprawl contract), `SANDBOX_CONTRACT.md`.
 
-## What To Do Next
+## Next move (recommended)
 
-1. Confirm mode — R&D. Branch `gut-renovation` is already checked out (findings committed there).
-2. Finish reading the 2026-07-01 report (§4 S=6 correction, §6 step-2 design).
-3. Run the FREE check: disaggregate PR #37 physics fire-rates by attack subclass.
-4. Design + run step 2: real-GCP edge-reciprocity + density observation harness. Predict-then-observe.
-5. Decide instrument-replacement (Branch C) based on the reciprocity result.
+De-rig landscape → build B1 → run the gated comparison. If KILL confirmed, execute the `src/` deletion
+list in DECISION_MEMO §6 (physics.py, Schnakenberg in graph.py, sigma_coarse/delta_f + fusion weights,
+theory docs). Committed on `gut-renovation` (not pushed).
 
-## Branch note
+## Branch
 
-`gut-renovation` off `main` holds this session's report, raw research, and handoff files. The name
-signals the intent: this may become a larger simplification/de-sprawl of the scoring stack, not just a
-physics fix (closure_gap 3.3x + inv_score 2.2x carry the system; ~8 other signals underperform).
+`gut-renovation` — holds the bake-off + this session's commits. Not pushed; push/PR left for review.

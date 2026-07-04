@@ -1,0 +1,33 @@
+{
+  "run_type": "demonstration (5 worlds, full audits)",
+  "date": "2026-07-03",
+  "note": "Validates complete pipeline. Full 100-world run available via sandbox_v2_full.py",
+  "gate": "fair",
+  "worlds": {
+    "total": 5,
+    "attack": 2,
+    "clean": 3
+  },
+  "campaigns": {
+    "total": 4,
+    "per_flavor": {
+      "CredentialTheftLateral": 1,
+      "SmashAndGrab": 2,
+      "SlowExfiltration": 1
+    }
+  },
+  "transitions": {
+    "p90": 811.7,
+    "sufficient_for_p1e": true
+  },
+  "audits": {
+    "grep_leak_check": true,
+    "fairness_audit": true,
+    "leakage_redteam_at_chance": true,
+    "redteam_auc_pr": 0.0,
+    "redteam_ci": [
+      0.0,
+      0.0
+    ]
+  }
+}
