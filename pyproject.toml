@@ -8,6 +8,7 @@ dependencies = [
     "duckdb>=1.0",
     "google-cloud-storage>=2.14",
     "numpy>=1.26",
+    "scikit-learn>=1.9.0",
 ]
 
 [project.scripts]

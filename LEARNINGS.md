@@ -6,6 +6,43 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-07-01 — R&D — Physics-signal fresh-eyes review: deep-research verdict = instrument, not sandbox
+
+**Step 1 — Session Summary (Mode: R&D).**
+Ran a grounded deep-research pass (5 angles, 21 sources, adversarial verify) on whether the
+Schnakenberg physics signals (`sigma_coarse`, `delta_f`) fail because of (a) impoverished sandbox,
+(b) domain sparsity, (c) estimator wrong for acyclic flows, or (d) thesis wrong. **Verdict: most
+likely (c) — the cycle-current estimator is structurally wrong for one-way attack flows; thesis not
+disproven.** Full report: `docs/rd_reports/2026-07-01_physics_signal_research.md`. Raw research
+results: `docs/rd_reports/2026-07-01_physics_research_raw.json`. Status: research COMPLETE; step 2
+(real-data observation) NOT started. Also amended Peyara standards (Autonomous mode) and added
+WebSearch/WebFetch to user settings allow-list.
+
+**Step 2 — Decisions Log.**
+
+| Decision | Alternatives | Why rejected |
+|---|---|---|
+| Ground deep-research in repo first (Explore agent) before firing web searches | Run `/deep-research` cold on the raw prompt | Web-only workflow can't answer "is OUR choice good"; ungrounded searches → generic literature dump |
+| Verdict = instrument mismatch (c), not sandbox (a) | Accept user's sandbox hypothesis as-is | Sandbox hypothesis unfalsifiable from inside the sandbox; failure mode (0%, not weak) + acyclic-flow structural argument point to the estimator |
+| Corrected the research's S=100–1000 → S=6 | Take the "10⁴–10⁶ samples needed" headline at face value | Murmur's chain is 6 zones; real floor ≈ 20 transitions. Uncorrected → wrong "give up, data-starved" call |
+| Step 2 = measure edge reciprocity on real GCP benign data | Rebuild sandbox first | Reciprocity is the single measurement that discriminates (a)/(b)/(c); rebuilding sandbox risks confirmation bias |
+| Amend Peyara standards (not global) for autonomous relaxations; scope to Autonomous mode only | Edit global; relax across all modes | User chose Peyara (team-shared, version-controlled); mode-scoping avoids Production/R&D bleed |
+
+**Step 3 — CLAUDE.md Exceptions.** No exceptions this session. (Config edits were user-requested; git
+commit pending explicit sign-off per Safety.)
+
+**Step 4 — Open Questions.**
+1. Does benign GCP traffic actually exhibit reciprocal zone edges (round-trips)? If not, Schnakenberg is wrong for the whole domain. **(Load-bearing — resolve first in step 2.)**
+2. Disaggregate PR #37's 0%/5% by attack subclass — does physics fire on cyclic-recon while dying on acyclic exfil? (Free check, existing data.)
+3. Global `~/.claude/CLAUDE.md` now inconsistent with Peyara standards — port precedence up, or have global defer to project?
+4. Commit the peyara-standards CLAUDE.md change (separate repo, currently uncommitted working-tree)?
+
+**Step 5 — CLAUDE.md Evolution Candidates.**
+- "Verify architecture constants (state-space size, window counts) before importing an external
+  theoretical bound" — emerged from the S=6 catch. **Recommend: watch** (may generalize to a
+  "sanity-check imported bounds against real system parameters" R&D principle).
+- "Deep-research on internal-design questions must be grounded in the repo first" — **watch**.
+
 ### 2026-04-30 — R&D — Session S addendum: post-merge discussion + Sprint 2.5 design
 
 Continuation of Session S after PR #37 merged. Captures the architecture-review discussion and the Sprint 2.5 spec landed via PR #38.
@@ -1634,3 +1671,37 @@ These do NOT overlap. CURRENT_STATE.md points to LEARNINGS.md for history; LEARN
 1. "Hypothesis-driven phasing" as R&D pattern — watch
 2. "Sprint docs as living documents" — watch
 3. Persistent mode field in project CLAUDE.md — watch
+
+---
+
+## 2026-07-03 (R&D, autonomous) — Physics falsification: interim KILL-lean
+
+**Assumed:** a per-actor excess/nonadiabatic EP signal (Hatano–Sasa), scoring departure from an actor's
+own NESS baseline, would (a) ignore benign housekeeping and (b) catch living-off-the-land via rate/order
+deviation.
+
+**Observed (balanced dev landscape, 20 campaigns/flavor incl. LOTL):**
+- (a) HELD: benign housekeeping (ETL/backup one-way) → P1e 0.000. The reformulation genuinely dissolves
+  the "benign is also irreversible" confound that killed Schnakenberg.
+- (b) BROKE: P1e is DEAD on LOTL (×0.01). LOTL reuses the actor's own edges → the window's transition
+  *distribution* matches the baseline → `D_KL(window‖baseline)≈0` by construction. Excess-EP measures
+  distributional departure; LOTL preserves the distribution. Structural, not tuning.
+- P2 (absolute flux) discriminates nothing — benign one-way automation has maximal flux.
+- P1e's only strong flavor (SA-hijack ×7.55) coincides with a landscape leak a dumb shallow cheat also
+  catches (AUC-PR 0.70) → not independent physics value.
+
+**Adapted:** interim verdict = strong KILL-lean; did NOT declare a final gated KILL (needs a de-rigged
+landscape + B1 comparison). Fixed the balanced-allocation bug (LOTL was being starved) and the
+instance-grouped fairness red-team (was reading `.labels` not `.campaigns`).
+
+**Principles (candidate standards):**
+- *A signal that only solves a confound but then has nothing to catch is not a signal.* Solving the
+  ETL/housekeeping confound revealed emptiness, not a niche.
+- *Distribution-comparison detectors are blind to attacks that preserve the distribution.* LOTL (reuse
+  own edges, change order/rate) defeats any KL-from-own-baseline measure. Directional/order/rate-sensitive
+  statistics — not distributional ones — are what LOTL requires.
+- *A detector's apparent "win" must be cross-checked against the fairness red-team:* P1e's SA-hijack win
+  rode the same landscape leak a trivial cheat exploited. Always ask whether a win coincides with a leak.
+- *Verify workflow self-reports.* Four workflow self-assessments this session were wrong (Phase-1
+  convergence threshold drift; Phase-2 100%-attack + vacuous gate; sandbox-v2 5-world demo + vacuous gate;
+  unimplemented balanced allocation). The adversarial verify agent + my own second pass caught each.

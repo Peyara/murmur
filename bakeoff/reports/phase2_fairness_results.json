@@ -1,0 +1,170 @@
+{
+  "timestamp": "2026-07-04T01:32:02",
+  "num_seeds": 24,
+  "max_rounds": 2,
+  "round_results": [
+    {
+      "round": 1,
+      "seeds": [
+        10000,
+        10001,
+        10002,
+        10003,
+        10004,
+        10005,
+        10006,
+        10007,
+        10008,
+        10009,
+        10010,
+        10011,
+        10012,
+        10013,
+        10014,
+        10015,
+        10016,
+        10017,
+        10018,
+        10019,
+        10020,
+        10021,
+        10022,
+        10023
+      ],
+      "grep_leak_check": {
+        "passed": true,
+        "summary": "\u2713 PASS: No label leakage detected in 24 worlds",
+        "leaks_found": 0
+      },
+      "fairness_audit": {
+        "passed": false,
+        "summary": "\u2717 FAIL: 2 gates failed: node_degrees_separable, attack_path_lengths_outside_iqr",
+        "details_count": 7,
+        "per_actor_transitions": {
+          "active_actors": [
+            129,
+            360,
+            996.167638483965
+          ]
+        }
+      },
+      "leakage_redteam": {
+        "at_chance": false,
+        "auc_pr": 0.7916666666666666,
+        "ci": [
+          0.47005952380952376,
+          1.0
+        ],
+        "no_skill": 0.08333333333333333,
+        "message": "RIGGED: cheat detector beats chance on subtle attacks []. Held-out AUC-PR 0.792 [CI 0.470-1.000] vs no-skill 0.083. Top leaking features: [('mean_degree', 1.1670692062545627), ('edge_diversity_ratio', 1.0449922336197832), ('max_degree', 1.0075552999394277)].",
+        "stratified": {
+          "CredentialTheftLateral": {
+            "n_pos": 2,
+            "status": "insufficient",
+            "at_chance": true,
+            "is_subtle": false
+          },
+          "LivingOffTheLand": {
+            "n_pos": 1,
+            "status": "insufficient",
+            "at_chance": true,
+            "is_subtle": true
+          },
+          "SlowExfiltration": {
+            "n_pos": 2,
+            "status": "insufficient",
+            "at_chance": true,
+            "is_subtle": true
+          },
+          "SmashAndGrab": {
+            "n_pos": 3,
+            "auc_pr": 0.7916666666666666,
+            "no_skill": 0.03296703296703297,
+            "ci_upper": 1.0,
+            "at_chance": false,
+            "is_subtle": false
+          }
+        }
+      }
+    },
+    {
+      "round": 2,
+      "seeds": [
+        20000,
+        20001,
+        20002,
+        20003,
+        20004,
+        20005,
+        20006,
+        20007,
+        20008,
+        20009,
+        20010,
+        20011,
+        20012,
+        20013,
+        20014,
+        20015,
+        20016,
+        20017,
+        20018,
+        20019,
+        20020,
+        20021,
+        20022,
+        20023
+      ],
+      "grep_leak_check": {
+        "passed": true,
+        "summary": "\u2713 PASS: No label leakage detected in 24 worlds",
+        "leaks_found": 0
+      },
+      "fairness_audit": {
+        "passed": false,
+        "summary": "\u2717 FAIL: 2 gates failed: node_degrees_separable, attack_path_lengths_outside_iqr",
+        "details_count": 7,
+        "per_actor_transitions": {
+          "active_actors": [
+            128,
+            360,
+            999.7835867527598
+          ]
+        }
+      },
+      "leakage_redteam": {
+        "at_chance": false,
+        "auc_pr": 0.8226190476190476,
+        "ci": [
+          0.542522564581388,
+          1.0
+        ],
+        "no_skill": 0.08333333333333333,
+        "message": "RIGGED: cheat detector beats chance on subtle attacks []. Held-out AUC-PR 0.823 [CI 0.543-1.000] vs no-skill 0.083. Top leaking features: [('mean_degree', 2.0364376632393895), ('max_degree', 0.9737766903435391), ('unique_actions', 0.5692343930597888)].",
+        "stratified": {
+          "CredentialTheftLateral": {
+            "n_pos": 2,
+            "status": "insufficient",
+            "at_chance": true,
+            "is_subtle": false
+          },
+          "ServiceAccountHijack": {
+            "n_pos": 2,
+            "status": "insufficient",
+            "at_chance": true,
+            "is_subtle": true
+          },
+          "SmashAndGrab": {
+            "n_pos": 4,
+            "auc_pr": 0.740909090909091,
+            "no_skill": 0.043478260869565216,
+            "ci_upper": 1.0,
+            "at_chance": false,
+            "is_subtle": false
+          }
+        }
+      }
+    }
+  ],
+  "outcome": "RIGGED"
+}

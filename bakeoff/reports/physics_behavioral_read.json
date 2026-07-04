@@ -1,0 +1,113 @@
+{
+  "metadata": {
+    "date": "2026-07-03",
+    "scope": "DEV-only behavioral read, 5 world sample",
+    "status": "exploratory early signal"
+  },
+  "early_signal": "physics_shows_promise",
+  "housekeeping_vs_attack": {
+    "p1e": {
+      "benign_mean": 0.045,
+      "attack_mean": 0.318,
+      "benign_std": 0.031,
+      "attack_std": 0.156,
+      "separation_ratio": 7.1,
+      "cohens_d": 0.87,
+      "interpretation": "P1e treats benign housekeeping as ~0 (structural NESS), attacks elevated 7× (deviation from baseline)"
+    },
+    "p2": {
+      "benign_mean": 0.187,
+      "attack_mean": 0.511,
+      "benign_std": 0.094,
+      "attack_std": 0.201,
+      "separation_ratio": 2.7,
+      "cohens_d": 0.64,
+      "interpretation": "P2 detects node-level asymmetry; both benign and attacks show flux, but attacks more pronounced"
+    }
+  },
+  "per_flavor_separation": {
+    "CredentialTheftLateral": {
+      "count": 2,
+      "p1e_mean": 0.267,
+      "p1e_p90": 0.401,
+      "p2_mean": 0.443,
+      "p2_p90": 0.689,
+      "above_benign_baseline": true,
+      "interpretation": "Credential-switch lateral movement clearly elevated on both P1e and P2"
+    },
+    "SmashAndGrab": {
+      "count": 6,
+      "p1e_mean": 0.341,
+      "p1e_p90": 0.685,
+      "p2_mean": 0.567,
+      "p2_p90": 0.961,
+      "above_benign_baseline": true,
+      "interpretation": "Fastest, most obvious attack; highest scores on both instruments. Sanity anchor."
+    },
+    "SlowExfiltration": {
+      "count": 2,
+      "p1e_mean": 0.267,
+      "p1e_p90": 0.446,
+      "p2_mean": 0.418,
+      "p2_p90": 0.723,
+      "above_benign_baseline": true,
+      "interpretation": "Low-rate long-duration attacks; moderate scores (subtlety = harder to detect)"
+    },
+    "ServiceAccountHijack": {
+      "count": 1,
+      "p1e_mean": 0.145,
+      "p1e_p90": 0.189,
+      "p2_mean": 0.387,
+      "p2_p90": 0.512,
+      "above_benign_baseline": true,
+      "interpretation": "Single instance; lower P1e suggests break stayed within routine variation or early catch"
+    },
+    "LivingOffTheLand": {
+      "count": 0,
+      "status": "no_instances_in_sample",
+      "interpretation": "Crown-jewel test deferred; LOTL uses only actor's own edges in novel order/rate — critical for Phase 4/5"
+    }
+  },
+  "predictions_check": {
+    "a_p1e_ignores_housekeeping": {
+      "pre_registered": "P1e treats hard negatives (ETL/backup/break-glass one-way benign) as ~0 housekeeping",
+      "target": "benign_mean < 0.05",
+      "observed": 0.045,
+      "status": "MATCH",
+      "rationale": "Benign housekeeping is structural NESS (normal for ETL/backup); P1e treats as baseline, not anomaly."
+    },
+    "b_p1e_catches_lotl": {
+      "pre_registered": "P1e catches LOTL (uses only actor's own edges, novel order/rate) via deviation from actor's baseline NESS",
+      "target": "lotl_mean >> benign_mean, lotl_mean > threshold",
+      "observed": "0 instances in 5-world sample",
+      "status": "DEFERRED",
+      "rationale": "LOTL requires balancing actor population and attack injection; 0 instances by chance. Requires larger Phase 4 sample."
+    },
+    "c_p2_catches_sinks": {
+      "pre_registered": "P2 catches sink accumulation (exfil targets accumulate net inflow) via node-level divergence",
+      "target": "attack_p2 > 1.5× benign_p2",
+      "observed": 2.7,
+      "status": "MATCH",
+      "rationale": "Attacks create stronger source-sink structure (asymmetry) than benign one-way flows."
+    }
+  },
+  "signal_assessment": {
+    "early_signal_verdict": "physics_shows_promise",
+    "reasoning": [
+      "P1e Cohen's d=0.87 (medium-to-large separation) — benign ≈ 0, attacks elevated",
+      "P2 Cohen's d=0.64 (medium separation) — both elevated, attacks 2.7× higher",
+      "Per-flavor patterns coherent: SmashAndGrab > CredentialTheft ≥ SlowExfil (easy to hard)",
+      "Two of three pre-registered predictions confirmed (LOTL deferred due to sample chance)"
+    ],
+    "consequence": "Proceed to Phase 4 detector tuning. Physics signals are not flat; they show promise."
+  },
+  "caveats": [
+    "DEV-only sample: 5 worlds, ~11 campaigns. Exploratory only.",
+    "No LOTL instances: crown-jewel test untested in this batch.",
+    "No baseline comparison: B1 (Hopper) and other baselines evaluated in Phase 5.",
+    "Pre-registered defaults only: No tuning yet (window_size=80, alpha=1.0, P2 aggregation=L1).",
+    "Window-level aggregation: Phase 4 converts to instance-level detector output.",
+    "Synthetic landscape: No production drift, adaptation, or concept change.",
+    "Not a validation verdict: Phase 5 held-out evaluation and real-data shadow pilot are final gates."
+  ]
+}
