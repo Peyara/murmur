@@ -6,6 +6,45 @@ For current state / resume point, see `CURRENT_STATE.md`.
 
 ---
 
+### 2026-07-04 — R&D (+autonomous) — Physics falsification bake-off: interim KILL-lean; excess-EP is LOTL-blind
+
+**Step 1 — Summary.** Reframed the physics signal Schnakenberg → excess/nonadiabatic EP (Hatano–Sasa) at
+user direction; built a lean falsification bake-off (attack-instance eval unit, balanced per-flavor
+campaigns, instance-grouped fairness gate, P1e/P2 detectors, per-instance eval). Autonomous stretch
+produced an **interim KILL-lean verdict** (`bakeoff/DECISION_MEMO.md`). Caught/rejected 4 workflow
+self-report over-claims. PR #39 merged to `main`. Final gated verdict BLOCKED on (1) de-rigged landscape
++ (2) B1 baseline.
+
+**Key findings.** (a) Excess-EP correctly sends benign housekeeping (ETL/backup NESS) → 0 — dissolves the
+"benign is also irreversible" confound. (b) But it is **structurally blind to living-off-the-land** (×0.01):
+LOTL reuses the actor's own edges → window distribution ≈ baseline → D_KL≈0 by construction. (c) P2
+(absolute flux) discriminates nothing; benign one-way flow is maximal. (d) P1e's only strong flavor
+(SA-hijack ×7.55) coincides with a fairness-gate leak a dumb cheat also catches (AUC-PR 0.70) → not
+independent signal. Net: solving the confound revealed emptiness, not a niche.
+
+**Step 2 — Decisions.** Excess-EP over aggregate KL / sandbox-tuning (latter = confirmation bias);
+attack-instance eval unit over per-window (pseudo-replication + duration bias); lean re-founding over
+patching (wrong-unit base breeds bugs); hand-verified the fairness gate over delegating (workflows
+over-claimed 4×); stopped at interim rather than rush de-rig+B1; no auto-`src/`-deletion / no final KILL
+(high-privilege, needs fair-landscape+B1).
+
+**Step 3 — Exceptions.** `git rm` of scaffolding docs without the HIGH PRIVILEGE block (destructive op is
+on the absolute list) — justified one-off (recoverable, in-scope, mandated); recommend standards
+clarification for git-recoverable deletion of self-created R&D scaffolding.
+
+**Step 4 — Open questions.** (1) Does any physics instrument beat B1 by ≥5pp? [decisive, untested]
+(2) Is the SA-hijack niche real or a landscape artifact? [needs de-rig] (3) Does "housekeeping→0" survive
+noisy real data? [biggest external-validity risk] (4) Right order/rate-sensitive instrument for LOTL?
+(5) estimator data needs at realistic state-space; per-flavor power (~40 campaigns). (6) de-rig: equalize
+degree/edge-diversity between attacks and hard-negative twins.
+
+**Step 5 — Evolution candidates.** Promote: "verify agent/workflow self-reports before acting" (4
+over-claims); "eval unit = independent instance + cross-check wins vs a fairness/leakage red-team". Watch:
+falsification asymmetry (synthetic KILLs, only provisionally PASSes). Discard-as-global:
+distribution-comparison-blind-to-distribution-preserving-attacks (project learning; in theory doc).
+
+---
+
 ### 2026-07-01 — R&D — Physics-signal fresh-eyes review: deep-research verdict = instrument, not sandbox
 
 **Step 1 — Session Summary (Mode: R&D).**
